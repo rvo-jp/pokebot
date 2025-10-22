@@ -6,10 +6,7 @@
 char *name = "BlueStacks App Player";
 int X, Y;
 
-INPUT INPUT_LEFTCLICK[2] = {
-    {.type = INPUT_MOUSE, .mi.dwFlags = MOUSEEVENTF_LEFTDOWN},
-    {.type = INPUT_MOUSE, .mi.dwFlags = MOUSEEVENTF_LEFTUP}
-};
+
 
 typedef struct coler {
     uint8_t r;
@@ -72,9 +69,40 @@ bool testpixel(POINT point, COLOR color) {
     return result;
 }
 
+void movecursor(int x, int y) {
+    SetCursorPos(X + x, Y + y + 33);
+}
+
+void leftdown() {
+    INPUT input[1] = {
+        {.type = INPUT_MOUSE, .mi.dwFlags = MOUSEEVENTF_LEFTDOWN}
+    };
+    SendInput(1, input, sizeof(INPUT));
+}
+
+void leftup() {
+    INPUT input[1] = {
+        {.type = INPUT_MOUSE, .mi.dwFlags = MOUSEEVENTF_LEFTUP}
+    };
+    SendInput(1, input, sizeof(INPUT));
+}
+
 void leftclick(int x, int y) {
     SetCursorPos(X + x, Y + y + 33);
-    SendInput(2, INPUT_LEFTCLICK, sizeof(INPUT));
+    INPUT input[2] = {
+        {.type = INPUT_MOUSE, .mi.dwFlags = MOUSEEVENTF_LEFTDOWN},
+        {.type = INPUT_MOUSE, .mi.dwFlags = MOUSEEVENTF_LEFTUP}
+    };
+    SendInput(2, input, sizeof(INPUT));
+}
+
+void inputkey(char key) {
+    WORD wVk = VkKeyScan(key) & 0xFF;
+    INPUT input[2] = {
+        {.type = INPUT_KEYBOARD, .ki.wVk = wVk},
+        {.type = INPUT_KEYBOARD, .ki.wVk = wVk, .ki.dwFlags = KEYEVENTF_KEYUP}
+    };
+    SendInput(2, input, sizeof(INPUT));
 }
 
 void s1();
@@ -99,7 +127,27 @@ void s19();
 void s20();
 void s21();
 void s22();
-void (*func)() = s21;
+void s23();
+void s24();
+void s25();
+void s26();
+void s27();
+void s28();
+void s29();
+void s30();
+void s31();
+void s32();
+void s33();
+void s34();
+void s35();
+void s36();
+void s37();
+void s38();
+void s39();
+void s40();
+void s41();
+void s42();
+void (*func)() = s42;
 
 // スタートスクリーン
 void s1() {
@@ -157,7 +205,7 @@ void s6() {
     puts("s6");
     if (testpixel((POINT){400, 678}, (COLOR){75, 91, 116})) {
         leftclick(208, 842);
-        func = s1;
+        func = s7;
     }
 }
 
@@ -273,7 +321,7 @@ void s18() {
     if (testpixel((POINT){140, 620}, (COLOR){239, 247, 250})) {
         leftclick(225, 620);
         puts("movie");
-        func = s1;
+        func = s19;
     }
 }
 
@@ -318,8 +366,203 @@ void s22() {
 // プレイヤー名
 void s23() {
     puts("s23");
-    if (testpixel((POINT){260, 454}, (COLOR){232, 127, 55})) {
-        leftclick(340, 744);
+    if (testpixel((POINT){223, 620}, (COLOR){173, 194, 222})) {
+        leftclick(266, 399);
+        func = s24;
+    }
+}
+
+// プレイヤー名 入力欄を開く
+void s24() {
+    puts("s24");
+    if (testpixel((POINT){82, 500}, (COLOR){241, 66, 72})) {
+        leftclick(260, 414);
+        func = s25;
+    }
+}
+
+// プレイヤー名 入力
+void s25() {
+    puts("s25");
+    if (testpixel((POINT){260, 900}, (COLOR){255, 255, 255})) {
+        inputkey('a');
+        func = s26;
+    }
+}
+
+// プレイヤー名 OK
+void s26() {
+    puts("s26");
+    if (!testpixel((POINT){321, 622}, (COLOR){173, 194, 222})) {
+        leftclick(321, 622);
+        func = s27;
+    }
+}
+
+// プレイヤー名 OK(2)
+void s27() {
+    puts("s27");
+    if (!testpixel((POINT){223, 620}, (COLOR){173, 194, 222})) {
+        leftclick(223, 620);
+        func = s28;
+    }
+}
+
+// プレイヤー名 OK(3) 30日間変更できない
+void s28() {
+    puts("s28");
+    if (testpixel((POINT){155, 512}, (COLOR){241, 62, 68})) {
+        leftclick(325, 622);
+        puts("open 1st pack");
+        func = s29;
+    }
+}
+
+// 1回目パック開封
+void s29() {
+    puts("s29");
+    if (testpixel((POINT){191, 161}, (COLOR){57, 67, 81})) {
+        leftclick(265, 520);
+        func = s30;
+    }
+}
+
+// これにする
+void s30() {
+    puts("s30");
+    if (!testpixel((POINT){191, 161}, (COLOR){57, 67, 81})) {
+        leftclick(191, 726);
+        func = s31;
+    }
+}
+
+// アニメーションにより待機
+
+// スライド開封
+void s31() {
+    puts("s31");
+    if (testpixel((POINT){10, 10}, (COLOR){169, 196, 228})) {
+        movecursor(83, 540);
+        leftdown();
+        Sleep(100);
+        movecursor(165, 540);
+        Sleep(100);
+        movecursor(267, 540);
+        Sleep(100);
+        movecursor(370, 540);
+        Sleep(100);
+        movecursor(435, 539);
+        leftup();
+        func = s32;
+    }
+}
+
+// めくる 1　フシキダネ確定？
+void s32() {
+    puts("s32");
+    if (testpixel((POINT){122, 760}, (COLOR){69, 71, 70})) {
+        leftclick(260, 477);
+        func = s33;
+    }
+}
+
+// めくる 2
+void s33() {
+    puts("s33");
+    if (testpixel((POINT){122, 760}, (COLOR){69, 71, 70})) {
+        leftclick(260, 477);
+        func = s34;
+    }
+}
+
+// めくる 3
+void s34() {
+    puts("s34");
+    if (testpixel((POINT){122, 760}, (COLOR){69, 71, 70})) {
+        leftclick(260, 477);
+        func = s35;
+    }
+}
+
+// めくる 4
+void s35() {
+    puts("s35");
+    if (testpixel((POINT){122, 760}, (COLOR){69, 71, 70})) {
+        leftclick(260, 477);
+        func = s36;
+    }
+}
+
+// めくる 5 ガラガラ確定
+void s36() {
+    puts("s36");
+    if (testpixel((POINT){122, 760}, (COLOR){69, 71, 70})) {
+        leftclick(260, 477);
+        func = s37;
+    }
+}
+
+// アニメーション待機
+
+// 図鑑登録 上スライド
+void s37() {
+    puts("s37");
+    if (testpixel((POINT){72, 121}, (COLOR){88, 195, 252})) {
+        movecursor(262, 800);
+        leftdown();
+        Sleep(100);
+        movecursor(262, 575);
+        Sleep(100);
+        movecursor(262, 325);
+        leftup();
+        func = s38;
+    }
+}
+// アニメーション待機
+
+// ガラガラ観察
+void s38() {
+    puts("s38");
+    if (testpixel((POINT){238, 753}, (COLOR){59, 69, 84})) {
+        leftclick(435, 769);
+        func = s39;
+    }
+}
+
+// ガラガラ観察 ゆび
+void s39() {
+    puts("s39");
+    if (testpixel((POINT){262, 642}, (COLOR){246, 249, 248})) {
+        leftclick(262, 642);
+        func = s40;
+    }
+}
+
+// カードを動かす OK
+void s40() {
+    puts("s40");
+    if (testpixel((POINT){232, 96}, (COLOR){112, 127, 147})) {
+        leftclick(300, 838);
+        func = s41;
+    }
+}
+
+// 次に進む
+void s41() {
+    puts("s41");
+    if (testpixel((POINT){261, 588}, (COLOR){238, 246, 250})) {
+        leftclick(318, 624);
+        func = s42;
+    }
+}
+
+// アニメーション
+
+// ミッション
+void s42() {
+    puts("s42");
+    if (testpixel((POINT){20, 20}, (COLOR){117, 132, 152})) {
+        leftclick(467, 812);
         func = s1;
     }
 }
