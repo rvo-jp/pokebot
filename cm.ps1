@@ -1,0 +1,1 @@
+gcc mlt.c -o mlt.exe -lgdi32 -luser32

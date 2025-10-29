@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-char *name = "BlueStacks App Player";
+char *name = "BlueStacks App Player 1";
 int X, Y;
 
 
@@ -147,7 +147,7 @@ void s39();
 void s40();
 void s41();
 void s42();
-void (*func)() = s42;
+void (*func)() = s21;
 
 // スタートスクリーン
 void s1() {
@@ -315,9 +315,10 @@ void s17() {
 
 // ここ待機時間　ダウンロードサイズで可変
 
-// データのダウンロードが完了　OK
+// データのダウンロードが完了　OK x
 void s18() {
     puts("s18");
+    // 要修正
     if (testpixel((POINT){140, 620}, (COLOR){239, 247, 250})) {
         leftclick(225, 620);
         puts("movie");
@@ -325,10 +326,10 @@ void s18() {
     }
 }
 
-// ビデオスキップ 端っこタップ
+// ビデオスキップ 端っこタップ x
 void s19() {
     puts("s19");
-    if (!testpixel((POINT){482, 890}, (COLOR){239, 247, 250})) {
+    if (!testpixel((POINT){482, 890}, (COLOR){219, 232, 242})) {
         leftclick(482, 890);
         func = s20;
     }
@@ -366,7 +367,7 @@ void s22() {
 // プレイヤー名
 void s23() {
     puts("s23");
-    if (testpixel((POINT){223, 620}, (COLOR){173, 194, 222})) {
+    if (testpixel((POINT){160, 454}, (COLOR){75, 85, 98})) {
         leftclick(266, 399);
         func = s24;
     }
@@ -385,7 +386,12 @@ void s24() {
 void s25() {
     puts("s25");
     if (testpixel((POINT){260, 900}, (COLOR){255, 255, 255})) {
-        inputkey('a');
+        inputkey('i');
+        inputkey('n');
+        inputkey('i');
+        inputkey('b');
+        inputkey('o');
+        inputkey('t');
         func = s26;
     }
 }
@@ -541,7 +547,7 @@ void s39() {
 // カードを動かす OK
 void s40() {
     puts("s40");
-    if (testpixel((POINT){232, 96}, (COLOR){112, 127, 147})) {
+    if (testpixel((POINT){251, 830}, (COLOR){244, 249, 249})) { // 245, 249, 249も
         leftclick(300, 838);
         func = s41;
     }
