@@ -1,35 +1,9 @@
-#include <windows.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
-
-// int main() {
-//     HWND hwnd = FindWindow(NULL, "BlueStacks App Player 2");
-//     if (!hwnd) {
-//         printf("Error: '%s' not found\n", "BlueStacks App Player 2");
-//         return 1;
-//     }
-
-//     RECT wrect;
-//     int X, Y;
-//     if (GetWindowRect(hwnd, &wrect)) {
-//         X = wrect.left;
-//         Y = wrect.top;
-//         int width  = wrect.right - wrect.left;
-//         int height = wrect.bottom - wrect.top;
-
-//         printf("from: (%d, %d) size: %d x %d\n", X, Y, width, height);
-
-//         // SetWindowPos(hwnd, HWND_TOPMOST, X, Y, 557, 964, SWP_SHOWWINDOW);
-//     }
-
-//     return 0;
-// }
+#include "pokebot.h"
 
 HWND getWindow(char *name) {
     HWND hwnd = FindWindow(NULL, name);
     if (!hwnd) {
-        printf("Error: windows '%s' is not found\n", name);
+        printf("Error: window '%s' is not found\n", name);
         exit(1);
     }
     return hwnd;
@@ -91,10 +65,6 @@ void move(POINT pos) {
     SendInput(1, input, sizeof(INPUT));
 }
 
-bool resume = true;
-HHOOK mouseHook;  // グローバルフック用
-// HHOOK keyHook;
-
 POINT POS;
 
 bool LEFTDOWN = false;
@@ -124,46 +94,26 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
     return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
-// volatile DWORD lastKey = 0;
-
-
-// LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-//     if (nCode >= 0) {
-//         KBDLLHOOKSTRUCT *info = (KBDLLHOOKSTRUCT*)lParam;
-
-//         if (wParam == WM_KEYDOWN) {
-//             lastKey = info->vkCode;
-//         }
-//     }
-//     return CallNextHookEx(keyHook, nCode, wParam, lParam);
-// }
-
-
 int main() {
-    printf("Left click = Copy action\nRight click = Pause/Resume\nMiddle click = Open all packs\n");
+    HWND windows[] = {
+        getWindow("bot0"),
+        getWindow("bot1"),
+        getWindow("bot2"),
+        getWindow("bot3"),
+    };
 
-    mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseProc, NULL, 0);
-    // if (!mouseHook) {
-    //     printf("SetWindowsHookEx failed: %lu\n", GetLastError());
-    //     return 1;
-    // }
+    // HWND windows[] = {
+    //     getWindow("ru"),
+    //     getWindow("li"),
+    //     getWindow("s1"),
+    //     getWindow("s2"),
+    // };
 
-    // keyHook   = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
+    HHOOK mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseProc, NULL, 0);
 
+    bool resume = true;
 
     MSG msg;
-
-    // while (1) {
-    //     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-    //         TranslateMessage(&msg);
-    //         DispatchMessage(&msg);
-    //     }
-        
-    //     if (lastKey) { printf("Key pressed: VK=%lu\n", lastKey); lastKey = 0; }
-
-    //     Sleep(1);
-    // }
-
     while (1) {
         while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
             TranslateMessage(&msg);
@@ -174,19 +124,16 @@ int main() {
             if (resume) {
                 LONG X, Y, width, height;
 
-                HWND bot0 = getWindow("bot0");
                 RECT rect;
-                if (GetWindowRect(bot0, &rect)) {
+                if (GetWindowRect(windows[0], &rect)) {
                     X = POS.x - rect.left;
                     Y = POS.y - rect.top;
                     width  = rect.right - rect.left;
                     height = rect.bottom - rect.top;
                 }
 
-                printf("Left click: (%ld, %ld), Windows: %ldx%ld\n", X, Y, width, height);
-
                 for (int i = 1; i < 4; i ++) {
-                    HWND bot = getWindow((char[]){'b','o','t','0'+i,0});
+                    HWND bot = windows[i];
                     if (GetWindowRect(bot, &rect)) {
                         if (width != rect.right - rect.left || height != rect.bottom - rect.top) {
                             SetWindowPos(bot, HWND_TOPMOST, 0, 0, width, height, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
@@ -216,10 +163,8 @@ int main() {
         
         if (MIDDLEDOWN) {
             if (resume) {
-                puts("Open start");
-
                 for (int i = 0; i < 4; i ++) {
-                    HWND bot = getWindow((char[]){'b','o','t','0'+i,0});
+                    HWND bot = windows[i];
                     RECT rect;
                     if (GetWindowRect(bot, &rect)) {
                         LONG width  = rect.right - rect.left;
@@ -250,7 +195,6 @@ int main() {
                 }
 
                 move((POINT){.x = POS.x, .y = POS.y});
-                puts("Open end");
             }
             MIDDLEDOWN = false;
         }
@@ -258,6 +202,5 @@ int main() {
 
 
     UnhookWindowsHookEx(mouseHook);
-    printf("Done\n");
     return 0;
 }
