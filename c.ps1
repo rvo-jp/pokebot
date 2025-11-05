@@ -1,0 +1,1 @@
+gcc src/main.c -o dist/main.exe
