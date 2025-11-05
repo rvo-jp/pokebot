@@ -1,10 +1,27 @@
 #include <windows.h>
 #include <stdio.h>
+#include <process.h>
+
+// #include "pokebot.h"
+BOOL running = TRUE;
+char mainName[256] = "s1";
+char subAddress[16][16] = {
+    "127.0.0.1:5565",
+    "127.0.0.1:5635",
+    "127.0.0.1:5575"
+};
+int subLen = 3;
 
 HHOOK mouseHook, keyboardHook;
-HWND targetWindow;
+HWND mainWindow;
 POINT lpt = {.x = 0, .y = 0};
 DWORD ltm = 0;
+
+void __cdecl RunSystemAsync(void* arg) {
+    const char* cmd = (const char*)arg;
+    system(cmd);
+    _endthread(); // スレッド終了
+}
 
 LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION) {
@@ -13,16 +30,16 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
         HWND hClicked = WindowFromPoint(p->pt);
         HWND hRoot = GetAncestor(hClicked, GA_ROOT);
 
-        if (hRoot == targetWindow) {
+        if (hRoot == mainWindow) {
             POINT pt = p->pt;
 
             RECT rect;
-            GetWindowRect(targetWindow, &rect);
+            GetWindowRect(mainWindow, &rect);
             rect.top += 33;
             int winW = rect.right - rect.left;
             int winH = rect.bottom - rect.top;
-            int devW  = 1080;
-            int devH = 1920;
+            int devW  = 900;
+            int devH = 1600;
             
             pt.x -= rect.left;
             pt.y -= rect.top;
@@ -35,13 +52,17 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
             else if (wParam == WM_LBUTTONUP) {
                 DWORD tm = GetTickCount();
                 printf("Up: (%ld, %ld) ", pt.x, pt.y);
-                char cmd[256];
 
                 if (lpt.x == pt.x && lpt.y == pt.y) {
                     printf("tap\n");
                     int tapX = (double)pt.x * devW  / winW;
                     int tapY = (double)pt.y * devH / winH;
-                    sprintf(cmd, ".\\platform-tools\\adb -s 127.0.0.1:5645 shell input tap %ld %ld", tapX, tapY);
+
+                    for (int i = 0; i < subLen; i ++) {
+                        char cmd[256];
+                        sprintf(cmd, ".\\platform-tools\\adb -s %s shell input tap %ld %ld", subAddress[i], tapX, tapY);
+                        _beginthread(RunSystemAsync, 0, cmd);
+                    }
                 }
                 else {
                     printf("swipe\n");
@@ -49,10 +70,13 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
                     int startY = (double)lpt.y * devH / winH;
                     int endX = (double)pt.x * devW  / winW;
                     int endY = (double)pt.y * devH / winH;
-                    sprintf(cmd, ".\\platform-tools\\adb -s 127.0.0.1:5645 shell input swipe %ld %ld %ld %ld %ld", startX, startY, endX, endY, tm - ltm);
+
+                    for (int i = 0; i < subLen; i ++) {
+                        char cmd[256];
+                        sprintf(cmd, ".\\platform-tools\\adb -s %s shell input swipe %ld %ld %ld %ld %ld", subAddress[i], startX, startY, endX, endY, tm - ltm);
+                        _beginthread(RunSystemAsync, 0, cmd);
+                    }
                 }
-                
-                system(cmd);
             }
         }
     }
@@ -155,26 +179,34 @@ int vk_to_android(int vk) {
 }
 
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-    if (nCode == HC_ACTION && GetForegroundWindow() == targetWindow) {
+    if (nCode == HC_ACTION && GetForegroundWindow() == mainWindow) {
         KBDLLHOOKSTRUCT* kbd = (KBDLLHOOKSTRUCT*)lParam;
 
-        if (wParam == WM_KEYUP) {
-            printf("Key Up: %c\n", kbd->vkCode);
-            char cmd[256];
-            sprintf(cmd, ".\\platform-tools\\adb -s 127.0.0.1:5645 shell input keyevent %d", vk_to_android(kbd->vkCode));
-            system(cmd);
+        if (wParam == WM_KEYDOWN) {
+            printf("Key: %c\n", kbd->vkCode);
+            for (int i = 0; i < subLen; i ++) {
+                char cmd[256];
+                sprintf(cmd, ".\\platform-tools\\adb -s %s shell input keyevent %d", subAddress[i], vk_to_android(kbd->vkCode));
+                _beginthread(RunSystemAsync, 0, cmd);
+            }
         }
     }
     return CallNextHookEx(keyboardHook, nCode, wParam, lParam);
 }
 
+
 int main() {
-    targetWindow = FindWindowA(NULL, "bot0");
-    if (!targetWindow) {
-        puts("Error: bot0 not found");
+    mainWindow = FindWindowA(NULL, mainName);
+    if (!mainWindow) {
+        printf("Error: %s not found\n", mainName);
         return 1;
     }
 
+    for (int i = 0; i < subLen; i ++) {
+        char cmd[256];
+        sprintf(cmd, ".\\platform-tools\\adb connect %s", subAddress[i]);
+        system(cmd);
+    }
     system(".\\platform-tools\\adb devices");
 
     mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseProc, NULL, 0);
@@ -186,8 +218,12 @@ int main() {
     }
 
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)) {}
+    while (running && GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
 
+    system(".\\platform-tools\\adb disconnect");
     UnhookWindowsHookEx(mouseHook);
     UnhookWindowsHookEx(keyboardHook);
     return 0;
