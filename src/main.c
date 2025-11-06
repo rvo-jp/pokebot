@@ -1,9 +1,5 @@
-#include <windows.h>
-#include <stdio.h>
-#include <process.h>
+#include "pokebot.h"
 
-// #include "pokebot.h"
-BOOL running = TRUE;
 char mainName[256] = "s1";
 char subAddress[16][16] = {
     "127.0.0.1:5565",
@@ -13,7 +9,6 @@ char subAddress[16][16] = {
 int subLen = 3;
 int devW  = 900;
 int devH = 1600;
-
 
 static HHOOK mouseHook, keyboardHook;
 static HWND mainWindow;
@@ -193,7 +188,7 @@ static LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     return CallNextHookEx(keyboardHook, nCode, wParam, lParam);
 }
 
-void pokebot() {
+unsigned __stdcall Pokebot(void* arg) {
     mainWindow = FindWindowA(NULL, mainName);
     if (!mainWindow) {
         printf("Error: %s not found\n", mainName);
@@ -224,4 +219,5 @@ void pokebot() {
     UnhookWindowsHookEx(mouseHook);
     UnhookWindowsHookEx(keyboardHook);
     system(".\\platform-tools\\adb disconnect");
+    return 0;
 }

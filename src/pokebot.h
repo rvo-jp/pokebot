@@ -1,16 +1,16 @@
 #ifndef __POKEBOT__
 #define __POKEBOT__
 
-void pokebot();
+#include <windows.h>
+#include <stdio.h>
+#include <process.h>
 
-char mainName[256] = "s1";
-char subAddress[16][16] = {
-    "127.0.0.1:5565",
-    "127.0.0.1:5635",
-    "127.0.0.1:5575"
-};
-int subLen = 3;
-int devW  = 900;
-int devH = 1600;
+unsigned __stdcall Pokebot(void* arg);
+
+extern char mainName[256];
+extern char subAddress[16][16];
+extern int subLen;
+extern int devW;
+extern int devH;
 
 #endif

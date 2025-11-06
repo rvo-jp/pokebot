@@ -1,4 +1,3 @@
-#include <windows.h>
 #include "pokebot.h"
 
 HWND hEditMain, hEditText, hButton;
@@ -6,7 +5,30 @@ HWND hEditMain, hEditText, hButton;
 #define ID_TEXT_AREA 1002
 #define ID_LAUNCH_BTN 1003
 
-BOOL running = FALSE;
+FILE *deviceList;
+
+unsigned threadId;
+HANDLE hThread = NULL;
+
+static void LaunchBtn() {
+    SetWindowText(hButton, "...");
+
+    if (hThread) {
+        // 起動済み
+        PostThreadMessage(threadId, WM_QUIT, 0, 0);
+        WaitForSingleObject(hThread, INFINITE);
+        CloseHandle(hThread);
+
+        hThread = NULL;
+        SetWindowText(hButton, "Launch");
+    }
+    else {
+        // 起動
+        hThread = (HANDLE)_beginthreadex(NULL, 0, Pokebot, NULL, 0, &threadId);
+        SetWindowText(hButton, "Stop");
+    }
+}
+
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -24,44 +46,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
 
         case WM_COMMAND:
-            if (LOWORD(wParam) == ID_LAUNCH_BTN) {
-                if (!running) {
-                    GetWindowText(hEditMain, mainName, sizeof(mainName));
-                    char Buf[1024];
-                    GetWindowText(hEditText, Buf, sizeof(Buf));
-                    SetWindowText(hButton, "Stop");
-                    hThread = CreateThread(NULL, 0, pokebot, NULL, 0, NULL);
-                    running = TRUE;
-                }
-                else {
-                    PostThreadMessage(GetThreadId(hThread), WM_QUIT, 0, 0);
-                    WaitForSingleObject(hThread, 1000);
-                    CloseHandle(hThread);
-                    hThread = NULL;
-                    SetWindowText(hButton, "Launch");
-                    running = FALSE;
-                }
-            }
-            break;
+        if (LOWORD(wParam) == ID_LAUNCH_BTN) LaunchBtn();
+        break;
 
         case WM_DESTROY:
-            running = FALSE;
-            if (hThread) {
-                PostThreadMessage(GetThreadId(hThread), WM_QUIT, 0, 0);
-                WaitForSingleObject(hThread, 1000);
-                CloseHandle(hThread);
-            }
-            PostQuitMessage(0);
-            break;
+        if (hThread) {
+            PostThreadMessage(threadId, WM_QUIT, 0, 0);
+            WaitForSingleObject(hThread, INFINITE);
+            CloseHandle(hThread);
+        }
+        PostQuitMessage(0);
+        break;
 
         default:
-            return DefWindowProc(hwnd, msg, wParam, lParam);
+        return DefWindowProc(hwnd, msg, wParam, lParam);
     }
     return 0;
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-    LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     const char CLASS_NAME[] = "PokebotWindow";
 
     WNDCLASSEX wc = { sizeof(WNDCLASSEX) };
