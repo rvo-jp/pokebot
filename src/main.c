@@ -11,73 +11,74 @@ char subAddress[16][16] = {
     "127.0.0.1:5575"
 };
 int subLen = 3;
+int devW  = 900;
+int devH = 1600;
 
-HHOOK mouseHook, keyboardHook;
-HWND mainWindow;
-POINT lpt = {.x = 0, .y = 0};
-DWORD ltm = 0;
 
-void __cdecl RunSystemAsync(void* arg) {
-    const char* cmd = (const char*)arg;
-    system(cmd);
-    _endthread(); // スレッド終了
+static HHOOK mouseHook, keyboardHook;
+static HWND mainWindow;
+static POINT lpt = {.x = 0, .y = 0};
+static DWORD ltm = 0;
+
+// コマンド非同期実行
+static void SystemAsync(void* arg) {
+    system((char*)arg);
+    free(arg);
 }
 
-LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
+// 全デバイスに非同期タスク割り当て
+static void SendInputForEachDevices(const char* input) {
+    for (int i = 0; i < subLen; i ++) {
+        char* cmd = malloc(256);
+        sprintf(cmd, ".\\platform-tools\\adb -s %s shell input %s", subAddress[i], input);
+        _beginthread(SystemAsync, 0, cmd);
+    }
+}
+
+// マウス
+static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION) {
         PMSLLHOOKSTRUCT p = (PMSLLHOOKSTRUCT)lParam;
+        POINT pt = p->pt;
 
-        HWND hClicked = WindowFromPoint(p->pt);
-        HWND hRoot = GetAncestor(hClicked, GA_ROOT);
-
-        if (hRoot == mainWindow) {
-            POINT pt = p->pt;
-
+        if (GetAncestor(WindowFromPoint(p->pt), GA_ROOT) == mainWindow) {
             RECT rect;
             GetWindowRect(mainWindow, &rect);
-            rect.top += 33;
+            rect.top += 33; // 上の縁
             int winW = rect.right - rect.left;
             int winH = rect.bottom - rect.top;
-            int devW  = 900;
-            int devH = 1600;
-            
+
             pt.x -= rect.left;
             pt.y -= rect.top;
 
             if (wParam == WM_LBUTTONDOWN) {
                 lpt = pt;
                 ltm = GetTickCount();
-                printf("Down: (%ld, %ld)\n", pt.x, pt.y);
+                printf("Down: (%ld, %ld) > ", pt.x, pt.y);
             }
             else if (wParam == WM_LBUTTONUP) {
                 DWORD tm = GetTickCount();
-                printf("Up: (%ld, %ld) ", pt.x, pt.y);
+                printf("Up: (%ld, %ld)\n", pt.x, pt.y);
 
                 if (lpt.x == pt.x && lpt.y == pt.y) {
-                    printf("tap\n");
                     int tapX = (double)pt.x * devW  / winW;
                     int tapY = (double)pt.y * devH / winH;
 
-                    for (int i = 0; i < subLen; i ++) {
-                        char cmd[256];
-                        sprintf(cmd, ".\\platform-tools\\adb -s %s shell input tap %ld %ld", subAddress[i], tapX, tapY);
-                        _beginthread(RunSystemAsync, 0, cmd);
-                    }
+                    char buf[256];
+                    sprintf(buf, "tap %ld %ld", tapX, tapY);
+                    SendInputForEachDevices(buf);
                 }
                 else {
-                    printf("swipe\n");
                     int startX = (double)lpt.x * devW  / winW;
                     int startY = (double)lpt.y * devH / winH;
                     int endX = (double)pt.x * devW  / winW;
                     int endY = (double)pt.y * devH / winH;
 
-                    for (int i = 0; i < subLen; i ++) {
-                        char cmd[256];
-                        sprintf(cmd, ".\\platform-tools\\adb -s %s shell input swipe %ld %ld %ld %ld %ld", subAddress[i], startX, startY, endX, endY, tm - ltm);
-                        _beginthread(RunSystemAsync, 0, cmd);
-                    }
+                    char buf[256];
+                    sprintf(buf, "swipe %ld %ld %ld %ld %ld", startX, startY, endX, endY, tm - ltm);
+                    SendInputForEachDevices(buf);
                 }
-            }
+            }   
         }
     }
 
@@ -85,7 +86,7 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
 }
 
 // US配列前提
-int vk_to_android(int vk) {
+static int vk_to_android(int vk) {
     switch (vk) {
         case 'A': return 29;
         case 'B': return 30;
@@ -178,24 +179,21 @@ int vk_to_android(int vk) {
     }
 }
 
-LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
+// マウス
+static LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION && GetForegroundWindow() == mainWindow) {
         KBDLLHOOKSTRUCT* kbd = (KBDLLHOOKSTRUCT*)lParam;
 
         if (wParam == WM_KEYDOWN) {
-            printf("Key: %c\n", kbd->vkCode);
-            for (int i = 0; i < subLen; i ++) {
-                char cmd[256];
-                sprintf(cmd, ".\\platform-tools\\adb -s %s shell input keyevent %d", subAddress[i], vk_to_android(kbd->vkCode));
-                _beginthread(RunSystemAsync, 0, cmd);
-            }
+            char buf[256];
+            sprintf(buf, "keyevent %d", vk_to_android(kbd->vkCode));
+            SendInputForEachDevices(buf);
         }
     }
     return CallNextHookEx(keyboardHook, nCode, wParam, lParam);
 }
 
-
-int main() {
+void pokebot() {
     mainWindow = FindWindowA(NULL, mainName);
     if (!mainWindow) {
         printf("Error: %s not found\n", mainName);
@@ -218,13 +216,12 @@ int main() {
     }
 
     MSG msg;
-    while (running && GetMessage(&msg, NULL, 0, 0)) {
+    while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    system(".\\platform-tools\\adb disconnect");
     UnhookWindowsHookEx(mouseHook);
     UnhookWindowsHookEx(keyboardHook);
-    return 0;
+    system(".\\platform-tools\\adb disconnect");
 }

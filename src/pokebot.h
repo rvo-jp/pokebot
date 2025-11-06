@@ -1,14 +1,16 @@
 #ifndef __POKEBOT__
 #define __POKEBOT__
 
-DWORD WINAPI pokebot(LPVOID lpParam);
+void pokebot();
 
-HANDLE hThread = NULL;
-BOOL running = TRUE;
-char mainName[256] = "bot0";
+char mainName[256] = "s1";
 char subAddress[16][16] = {
-    "127.0.0.1:5645"
+    "127.0.0.1:5565",
+    "127.0.0.1:5635",
+    "127.0.0.1:5575"
 };
-int subLen = 1;
+int subLen = 3;
+int devW  = 900;
+int devH = 1600;
 
 #endif

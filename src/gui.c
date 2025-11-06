@@ -6,6 +6,8 @@ HWND hEditMain, hEditText, hButton;
 #define ID_TEXT_AREA 1002
 #define ID_LAUNCH_BTN 1003
 
+BOOL running = FALSE;
+
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_CREATE:
