@@ -1,6 +1,6 @@
 #include "pokebot.h"
 
-char mainName[256] = "s1";
+char mainName[256] = "";
 char subAddress[16][16] = {
     "127.0.0.1:5565",
     "127.0.0.1:5635",

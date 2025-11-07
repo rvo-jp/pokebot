@@ -1,12 +1,131 @@
 #include "pokebot.h"
 
-HWND hEditMain, hEditText, hButton;
 #define ID_MAIN_EDIT 1001
 #define ID_TEXT_AREA 1002
 #define ID_LAUNCH_BTN 1003
+#define ID_SCROLLAREA 1004
+#define ID_ADD_BUTTON 1005
+#define ID_DEL_BUTTON 1006
+#define IDC_EDIT_BASE   2000
 
-FILE *deviceList;
 
+HWND hEditMain, hWidth, hHeight, hAdd, hDel, hSubName[16], hSubAddr[16], hButton;
+int subCount = 0;
+
+static void AddSub(HWND hwnd, char *name, char *addr) {
+    char num[16];
+    sprintf(num, "%d", subCount + 1);
+    int h = 130 + subCount * 30;
+
+    CreateWindow("STATIC", num,
+        WS_VISIBLE | WS_CHILD,
+        20, h, 20, 25,
+        hwnd, NULL, NULL, NULL
+    );
+    hSubName[subCount] = CreateWindow(
+        "EDIT", name,
+        WS_VISIBLE | WS_CHILD | WS_BORDER,
+        40, h, 100, 25,
+        hwnd, (HMENU)ID_MAIN_EDIT, NULL, NULL
+    );
+
+    CreateWindow("STATIC", " 127.0.0.1:",
+        WS_VISIBLE | WS_CHILD,
+        140, h, 80, 25,
+        hwnd, NULL, NULL, NULL
+    );
+    hSubAddr[subCount] = CreateWindow(
+        "EDIT", addr,
+        WS_VISIBLE | WS_CHILD | WS_BORDER,
+        220, h, 50, 25,
+        hwnd, (HMENU)ID_MAIN_EDIT, NULL, NULL
+    );
+    subCount ++;
+}
+
+static void CreateGUI(HWND hwnd) {
+    char line[256];
+    FILE *fp = fopen("config.txt", "r");
+    if (!fp) {
+        fp = fopen("config.txt", "w");
+        fprintf(fp, "900:1600;MainWindow\nabc=127.0.0.1:5555\n");
+        fclose(fp);
+        fp = fopen("config.txt", "r");
+    }
+
+    char name[64], width[64], height[64];
+    if (fgets(line, sizeof(line), fp)) {
+        sscanf(line, "%63[^:]:%63[^;];%63s", width, height, name);
+    }
+
+    CreateWindow(
+        "STATIC", "Mainwindow:", WS_VISIBLE | WS_CHILD,
+        20, 20, 90, 25, hwnd, NULL, NULL, NULL
+    );
+    hEditMain = CreateWindow(
+        "EDIT", name, WS_VISIBLE | WS_CHILD | WS_BORDER,
+        110, 20, 160, 25, hwnd, (HMENU)ID_MAIN_EDIT, NULL, NULL
+    );
+
+    CreateWindow(
+        "STATIC", "Resolution:",
+        WS_VISIBLE | WS_CHILD,
+        20, 50, 90, 25,
+        hwnd, NULL, NULL, NULL
+    );
+    hWidth = CreateWindow(
+        "EDIT", width,
+        WS_VISIBLE | WS_CHILD | WS_BORDER,
+        110, 50, 70, 25,
+        hwnd, (HMENU)ID_MAIN_EDIT, NULL, NULL
+    );
+    CreateWindow(
+        "STATIC", " x ",
+        WS_VISIBLE | WS_CHILD,
+        180, 50, 20, 25,
+        hwnd, NULL, NULL, NULL
+    );
+    hHeight = CreateWindow(
+        "EDIT", height,
+        WS_VISIBLE | WS_CHILD | WS_BORDER,
+        200, 50, 70, 25,
+        hwnd, (HMENU)ID_MAIN_EDIT, NULL, NULL
+    );
+
+    CreateWindow("STATIC", "Subwindows:",
+        WS_VISIBLE | WS_CHILD,
+        20, 100, 190, 25,
+        hwnd, NULL, NULL, NULL
+    );
+    hAdd = CreateWindow("BUTTON", "+",
+        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        210, 100, 30, 25, hwnd, (HMENU)ID_ADD_BUTTON, NULL, NULL
+    );
+    hDel = CreateWindow("BUTTON", "-",
+        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        240, 100, 30, 25, hwnd, (HMENU)ID_DEL_BUTTON, NULL, NULL
+    );
+
+    while (fgets(line, sizeof(line), fp)) {
+        char name[64], addr[64];
+        if (sscanf(line, "%63[^=]=%63s", name, addr) == 2 && subCount < 16) {
+            AddSub(hwnd, name, addr);
+        }
+    }
+
+    // Launchボタン
+    hButton = CreateWindow(
+        "BUTTON", "Launch",
+        WS_VISIBLE | WS_CHILD | WS_BORDER,
+        190, 140 + subCount * 30, 80, 30,
+        hwnd, (HMENU)ID_LAUNCH_BTN, NULL, NULL
+    );
+    fclose(fp);
+
+    SetWindowPos(hwnd, NULL, 0, 0, 300, 220 + subCount * 30, SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW);
+}
+
+// Pokebot thread
 unsigned threadId;
 HANDLE hThread = NULL;
 
@@ -32,21 +151,19 @@ static void LaunchBtn() {
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
-        case WM_CREATE:
-            CreateWindow("STATIC", "Main Window:", WS_VISIBLE | WS_CHILD, 20, 20, 100, 25, hwnd, NULL, NULL, NULL);
-            hEditMain = CreateWindow("EDIT", "Name", WS_VISIBLE | WS_CHILD | WS_BORDER, 120, 20, 160, 25, hwnd, (HMENU)ID_MAIN_EDIT, NULL, NULL); 
-
-            CreateWindow("STATIC", "Sub Windows Address:", WS_VISIBLE | WS_CHILD, 20, 55, 160, 25, hwnd, NULL, NULL, NULL);
-            hEditText = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"120.0.0.1:55555\r\n",
-            WS_CHILD | WS_VISIBLE | WS_BORDER |
-            ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | WS_VSCROLL,
-            20, 80, 260, 100, hwnd, (HMENU)ID_TEXT_AREA, NULL, NULL);
-
-            hButton = CreateWindow("BUTTON", "Launch", WS_VISIBLE | WS_CHILD, 200, 195, 80, 30, hwnd, (HMENU)ID_LAUNCH_BTN, NULL, NULL);
-            break;
+        case WM_CREATE: CreateGUI(hwnd);
+        break;
 
         case WM_COMMAND:
-        if (LOWORD(wParam) == ID_LAUNCH_BTN) LaunchBtn();
+        switch (LOWORD(wParam)) {
+            case ID_LAUNCH_BTN: LaunchBtn();
+            break;
+            case ID_ADD_BUTTON:
+            if (subCount < 16) {
+                AddSub(hwnd, "", "");
+            }
+            break;
+        }
         break;
 
         case WM_DESTROY:
@@ -64,24 +181,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     return 0;
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    const char CLASS_NAME[] = "PokebotWindow";
 
-    WNDCLASSEX wc = { sizeof(WNDCLASSEX) };
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    WNDCLASS wc = { sizeof(WNDCLASS) };
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.lpszClassName = CLASS_NAME;
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    // wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.lpszClassName = "MainWnd";
+    // wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    RegisterClass(&wc);
 
-    RegisterClassEx(&wc);
-
-    HWND hwnd = CreateWindowEx(
-        0, CLASS_NAME, "Pokebot",
+    HWND hwnd = CreateWindow(
+        "MainWnd", "Pokebot",
         WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-        CW_USEDEFAULT, CW_USEDEFAULT, 310, 270,
-        NULL, NULL, hInstance, NULL);
-
+        CW_USEDEFAULT, CW_USEDEFAULT, 300, 400,
+        NULL, NULL, hInstance, NULL
+    );
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
 
@@ -90,5 +205,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+
     return 0;
 }
