@@ -1,0 +1,4 @@
+BlueStacks App Player;1080x1920
+1;BlueStacks App Player 1;5565
+1;BlueStacks App Player 2;5575
+1;BlueStacks App Player 3;5585

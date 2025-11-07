@@ -77,14 +77,14 @@ static void CreateGUI(HWND hwnd) {
     FILE *fp = fopen("config.txt", "r");
     if (!fp) {
         fp = fopen("config.txt", "w");
-        fprintf(fp, "900:1600;MainWindow\nabc=5555\n");
+        fprintf(fp, "BlueStacks App Player;1080:1920;\nBlueStacks App Player 1=5555\n");
         fclose(fp);
         fp = fopen("config.txt", "r");
     }
 
     char name[64], width[64], height[64];
     if (fgets(line, sizeof(line), fp)) {
-        sscanf(line, "%63[^:]:%63[^;];%63s", width, height, name);
+        sscanf(line, "%63[^;];%63[^x]x%63s", name, width, height);
     }
 
     CreateWindow(
@@ -139,7 +139,7 @@ static void CreateGUI(HWND hwnd) {
         if (subCount < 16) {
             BOOL use;
             char name[64] = "", addr[64] = "";
-            sscanf(line, "%d;%63[^=]=%63s", &use, name, addr);
+            sscanf(line, "%d;%63[^;];%63s", &use, name, addr);
             AddSub(hwnd, use, name, addr);
         }
     }
@@ -193,18 +193,19 @@ static void Destroy() {
     FILE *fp = fopen("config.txt", "w");
     char buf[256];
 
-    GetWindowTextA(hWidth, buf, sizeof(buf));
-    fprintf(fp, "%s:", buf);
-    GetWindowTextA(hHeight, buf, sizeof(buf));
-    fprintf(fp, "%s;", buf);
     GetWindowTextA(hEditMain, buf, sizeof(buf));
+    fprintf(fp, "%s;", buf);
+    GetWindowTextA(hWidth, buf, sizeof(buf));
+    fprintf(fp, "%sx", buf);
+    GetWindowTextA(hHeight, buf, sizeof(buf));
     fprintf(fp, "%s", buf);
+    
 
     for (int i = 0; i < subCount; i ++) {
         Subwindow sub = hSub[i];
         fprintf(fp, "\n%c;", SendMessage(sub.use, BM_GETCHECK, 0, 0) == BST_CHECKED ? '1' : '0');
         GetWindowTextA(sub.name, buf, sizeof(buf));
-        fprintf(fp, "%s=", buf);
+        fprintf(fp, "%s;", buf);
         GetWindowTextA(sub.addr, buf, sizeof(buf));
         fprintf(fp, "%s", buf);
     }
@@ -264,7 +265,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindow(
-        "MainWnd", "Pokebot",
+        "MainWnd", "Pokebot v1.0.0",
         WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
         CW_USEDEFAULT, CW_USEDEFAULT, 300, 400,
         NULL, NULL, hInstance, NULL
