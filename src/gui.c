@@ -9,37 +9,47 @@
 #define IDC_EDIT_BASE   2000
 
 
-HWND hEditMain, hWidth, hHeight, hAdd, hDel, hSubUse[16], hSubName[16], hSubAddrText[16], hSubAddr[16], hButton;
-int subCount = 0;
+static HWND hEditMain, hWidth, hHeight, hAdd, hDel, hButton;
+
+typedef struct {
+    HWND use;
+    HWND name;
+    HWND addr;
+    HWND text;
+} Subwindow;
+
+static Subwindow hSub[64];
+static int subCount = 0;
 
 // Pokebot thread
-unsigned threadId;
-HANDLE hThread = NULL;
+static unsigned threadId;
+static HANDLE hThread = NULL;
 
 
-static void AddSub(HWND hwnd, char *name, char *addr) {
+static void AddSub(HWND hwnd, BOOL use, char *name, char *addr) {
     int h = 130 + subCount * 30;
 
-    hSubUse[subCount] = CreateWindow(
+    hSub[subCount].use = CreateWindow(
         "BUTTON", "",
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
         20, h, 20, 25,
         hwnd, (HMENU)IDC_EDIT_BASE, NULL, NULL
     );
+    if (use) SendMessage(hSub[subCount].use, BM_SETCHECK, BST_CHECKED, 0);
 
-    hSubName[subCount] = CreateWindow(
+    hSub[subCount].name = CreateWindow(
         "EDIT", name,
         WS_VISIBLE | WS_CHILD | WS_BORDER,
         40, h, 100, 25,
         hwnd, (HMENU)ID_MAIN_EDIT, NULL, NULL
     );
 
-    hSubAddrText[subCount] = CreateWindow("STATIC", " 127.0.0.1:",
+    hSub[subCount].text = CreateWindow("STATIC", " 127.0.0.1:",
         WS_VISIBLE | WS_CHILD,
         140, h, 80, 25,
         hwnd, NULL, NULL, NULL
     );
-    hSubAddr[subCount] = CreateWindow(
+    hSub[subCount].addr = CreateWindow(
         "EDIT", addr,
         WS_VISIBLE | WS_CHILD | WS_BORDER,
         220, h, 50, 25,
@@ -50,10 +60,10 @@ static void AddSub(HWND hwnd, char *name, char *addr) {
 
 static void RemoveSub(HWND hwnd) {
     subCount--;
-    DestroyWindow(hSubUse[subCount]);
-    DestroyWindow(hSubName[subCount]);
-    DestroyWindow(hSubAddrText[subCount]);
-    DestroyWindow(hSubAddr[subCount]);
+    DestroyWindow(hSub[subCount].use);
+    DestroyWindow(hSub[subCount].name);
+    DestroyWindow(hSub[subCount].text);
+    DestroyWindow(hSub[subCount].addr);
 }
 
 static void UpdatePos(HWND hwnd) {
@@ -67,7 +77,7 @@ static void CreateGUI(HWND hwnd) {
     FILE *fp = fopen("config.txt", "r");
     if (!fp) {
         fp = fopen("config.txt", "w");
-        fprintf(fp, "900:1600;MainWindow\nabc=127.0.0.1:5555\n");
+        fprintf(fp, "900:1600;MainWindow\nabc=5555\n");
         fclose(fp);
         fp = fopen("config.txt", "r");
     }
@@ -126,9 +136,11 @@ static void CreateGUI(HWND hwnd) {
     );
 
     while (fgets(line, sizeof(line), fp)) {
-        char name[64], addr[64];
-        if (sscanf(line, "%63[^=]=%63s", name, addr) == 2 && subCount < 16) {
-            AddSub(hwnd, name, addr);
+        if (subCount < 16) {
+            BOOL use;
+            char name[64] = "", addr[64] = "";
+            sscanf(line, "%d;%63[^=]=%63s", &use, name, addr);
+            AddSub(hwnd, use, name, addr);
         }
     }
 
@@ -144,47 +156,77 @@ static void CreateGUI(HWND hwnd) {
     SetWindowPos(hwnd, NULL, 0, 0, 300, 220 + subCount * 30, SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW);
 }
 
-static void LaunchBtn() {
-    SetWindowText(hButton, "...");
+static void LaunchPokebot() {
+    GetWindowTextA(hEditMain, mainName, sizeof(mainName));
 
-    if (hThread) {
-//         GetWindowTextA(hEdit, buf, sizeof(buf));
-//         LRESULT state = SendMessage(hCheck, BM_GETCHECK, 0, 0);
-// if (state == BST_CHECKED) {
-//     printf("チェックON\n");
-// } else {
-//     printf("チェックOFF\n");
-// }
+    char buf[256];
+    GetWindowTextA(hWidth, buf, sizeof(buf));
+    devW = atoi(buf);
+    GetWindowTextA(hHeight, buf, sizeof(buf));
+    devH = atoi(buf);
 
-
-        // 起動済み
-        PostThreadMessage(threadId, WM_QUIT, 0, 0);
-        WaitForSingleObject(hThread, INFINITE);
-        CloseHandle(hThread);
-
-        hThread = NULL;
-        SetWindowText(hButton, "Launch");
+    for (int i = 0; i < subCount; i ++) {
+        Subwindow sub = hSub[i];
+        if (SendMessage(sub.use, BM_GETCHECK, 0, 0) == BST_CHECKED) {
+            GetWindowTextA(sub.addr, subAddress[subLen], 16);
+            subLen ++;
+        }
     }
-    else {
-        // 起動
-        hThread = (HANDLE)_beginthreadex(NULL, 0, Pokebot, NULL, 0, &threadId);
-        SetWindowText(hButton, "Stop");
-    }
+
+    hThread = (HANDLE)_beginthreadex(NULL, 0, Pokebot, NULL, 0, &threadId);
+    SetWindowText(hButton, "Stop");
 }
 
+static void StopPokebot() {
+    PostThreadMessage(threadId, WM_QUIT, 0, 0);
+    WaitForSingleObject(hThread, INFINITE);
+    CloseHandle(hThread);
 
-LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    hThread = NULL;
+    SetWindowText(hButton, "Launch");
+}
+
+static void Destroy() {
+    if (hThread) StopPokebot();
+    
+    // 設定保存
+    FILE *fp = fopen("config.txt", "w");
+    char buf[256];
+
+    GetWindowTextA(hWidth, buf, sizeof(buf));
+    fprintf(fp, "%s:", buf);
+    GetWindowTextA(hHeight, buf, sizeof(buf));
+    fprintf(fp, "%s;", buf);
+    GetWindowTextA(hEditMain, buf, sizeof(buf));
+    fprintf(fp, "%s", buf);
+
+    for (int i = 0; i < subCount; i ++) {
+        Subwindow sub = hSub[i];
+        fprintf(fp, "\n%c;", SendMessage(sub.use, BM_GETCHECK, 0, 0) == BST_CHECKED ? '1' : '0');
+        GetWindowTextA(sub.name, buf, sizeof(buf));
+        fprintf(fp, "%s=", buf);
+        GetWindowTextA(sub.addr, buf, sizeof(buf));
+        fprintf(fp, "%s", buf);
+    }
+    fclose(fp);
+
+    PostQuitMessage(0);
+}
+
+static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_CREATE: CreateGUI(hwnd);
         break;
 
         case WM_COMMAND:
         switch (LOWORD(wParam)) {
-            case ID_LAUNCH_BTN: LaunchBtn();
+            case ID_LAUNCH_BTN: 
+            if (hThread) StopPokebot();
+            else LaunchPokebot();
             break;
             case ID_ADD_BUTTON:
             if (subCount < 16) {
-                AddSub(hwnd, "", "");
+                AddSub(hwnd, FALSE, "", "");
                 UpdatePos(hwnd);
             }
             break;
@@ -204,22 +246,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             return 1; // 既に塗ったので既定処理しない
         }
 
-
-        case WM_DESTROY:
-        if (hThread) {
-            PostThreadMessage(threadId, WM_QUIT, 0, 0);
-            WaitForSingleObject(hThread, INFINITE);
-            CloseHandle(hThread);
-        }
-        PostQuitMessage(0);
+        case WM_DESTROY: Destroy();
         break;
-
-        default:
-        return DefWindowProc(hwnd, msg, wParam, lParam);
+        
+        default: break;
     }
-    return 0;
+    return DefWindowProc(hwnd, msg, wParam, lParam);
 }
-
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     WNDCLASS wc = { sizeof(WNDCLASS) };

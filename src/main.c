@@ -1,14 +1,10 @@
 #include "pokebot.h"
 
-char mainName[256] = "";
-char subAddress[16][16] = {
-    "127.0.0.1:5565",
-    "127.0.0.1:5635",
-    "127.0.0.1:5575"
-};
-int subLen = 3;
-int devW  = 900;
-int devH = 1600;
+char mainName[256];
+char subAddress[16][16];
+int subLen = 0;
+int devW  = 0;
+int devH = 0;
 
 static HHOOK mouseHook, keyboardHook;
 static HWND mainWindow;
@@ -25,7 +21,7 @@ static void SystemAsync(void* arg) {
 static void SendInputForEachDevices(const char* input) {
     for (int i = 0; i < subLen; i ++) {
         char* cmd = malloc(256);
-        sprintf(cmd, ".\\platform-tools\\adb -s %s shell input %s", subAddress[i], input);
+        sprintf(cmd, ".\\platform-tools\\adb -s 127.0.0.1:%s shell input %s", subAddress[i], input);
         _beginthread(SystemAsync, 0, cmd);
     }
 }
@@ -197,10 +193,10 @@ unsigned __stdcall Pokebot(void* arg) {
 
     for (int i = 0; i < subLen; i ++) {
         char cmd[256];
-        sprintf(cmd, ".\\platform-tools\\adb connect %s", subAddress[i]);
+        sprintf(cmd, ".\\platform-tools\\adb connect 127.0.0.1:%s", subAddress[i]);
         system(cmd);
     }
-    system(".\\platform-tools\\adb devices");
+    // system(".\\platform-tools\\adb devices");
 
     mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseProc, NULL, 0);
     keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
