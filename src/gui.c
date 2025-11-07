@@ -9,19 +9,24 @@
 #define IDC_EDIT_BASE   2000
 
 
-HWND hEditMain, hWidth, hHeight, hAdd, hDel, hSubName[16], hSubAddr[16], hButton;
+HWND hEditMain, hWidth, hHeight, hAdd, hDel, hSubUse[16], hSubName[16], hSubAddrText[16], hSubAddr[16], hButton;
 int subCount = 0;
 
+// Pokebot thread
+unsigned threadId;
+HANDLE hThread = NULL;
+
+
 static void AddSub(HWND hwnd, char *name, char *addr) {
-    char num[16];
-    sprintf(num, "%d", subCount + 1);
     int h = 130 + subCount * 30;
 
-    CreateWindow("STATIC", num,
-        WS_VISIBLE | WS_CHILD,
+    hSubUse[subCount] = CreateWindow(
+        "BUTTON", "",
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
         20, h, 20, 25,
-        hwnd, NULL, NULL, NULL
+        hwnd, (HMENU)IDC_EDIT_BASE, NULL, NULL
     );
+
     hSubName[subCount] = CreateWindow(
         "EDIT", name,
         WS_VISIBLE | WS_CHILD | WS_BORDER,
@@ -29,7 +34,7 @@ static void AddSub(HWND hwnd, char *name, char *addr) {
         hwnd, (HMENU)ID_MAIN_EDIT, NULL, NULL
     );
 
-    CreateWindow("STATIC", " 127.0.0.1:",
+    hSubAddrText[subCount] = CreateWindow("STATIC", " 127.0.0.1:",
         WS_VISIBLE | WS_CHILD,
         140, h, 80, 25,
         hwnd, NULL, NULL, NULL
@@ -41,6 +46,20 @@ static void AddSub(HWND hwnd, char *name, char *addr) {
         hwnd, (HMENU)ID_MAIN_EDIT, NULL, NULL
     );
     subCount ++;
+}
+
+static void RemoveSub(HWND hwnd) {
+    subCount--;
+    DestroyWindow(hSubUse[subCount]);
+    DestroyWindow(hSubName[subCount]);
+    DestroyWindow(hSubAddrText[subCount]);
+    DestroyWindow(hSubAddr[subCount]);
+}
+
+static void UpdatePos(HWND hwnd) {
+    SetWindowPos(hButton, NULL, 190, 140 + subCount * 30, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+    SetWindowPos(hwnd, NULL, 0, 0, 300, 220 + subCount * 30, SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW);
+    RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 }
 
 static void CreateGUI(HWND hwnd) {
@@ -125,14 +144,19 @@ static void CreateGUI(HWND hwnd) {
     SetWindowPos(hwnd, NULL, 0, 0, 300, 220 + subCount * 30, SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW);
 }
 
-// Pokebot thread
-unsigned threadId;
-HANDLE hThread = NULL;
-
 static void LaunchBtn() {
     SetWindowText(hButton, "...");
 
     if (hThread) {
+//         GetWindowTextA(hEdit, buf, sizeof(buf));
+//         LRESULT state = SendMessage(hCheck, BM_GETCHECK, 0, 0);
+// if (state == BST_CHECKED) {
+//     printf("チェックON\n");
+// } else {
+//     printf("チェックOFF\n");
+// }
+
+
         // 起動済み
         PostThreadMessage(threadId, WM_QUIT, 0, 0);
         WaitForSingleObject(hThread, INFINITE);
@@ -161,10 +185,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             case ID_ADD_BUTTON:
             if (subCount < 16) {
                 AddSub(hwnd, "", "");
+                UpdatePos(hwnd);
+            }
+            break;
+            case ID_DEL_BUTTON:
+            if (subCount > 0) {
+                RemoveSub(hwnd);
+                UpdatePos(hwnd);
             }
             break;
         }
         break;
+
+        case WM_ERASEBKGND: {
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            FillRect((HDC)wParam, &rc, (HBRUSH)(COLOR_WINDOW + 1));
+            return 1; // 既に塗ったので既定処理しない
+        }
+
 
         case WM_DESTROY:
         if (hThread) {
