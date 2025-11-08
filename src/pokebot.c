@@ -8,8 +8,7 @@ int devH = 0;
 
 static HHOOK mouseHook, keyboardHook;
 static HWND mainWindow;
-static POINT lpt = {.x = 0, .y = 0};
-static DWORD ltm = 0;
+
 
 // コマンド非同期実行
 static void RunCommandAsync(const char* cmd) {
@@ -26,7 +25,7 @@ static void RunCommandAsync(const char* cmd) {
 
     BOOL success = CreateProcessA(
         NULL,               // 実行ファイル名（cmdで指定するのでNULL）
-        (LPSTR)cmd,         // コマンドライン（書き換えられるためconst外す）
+        (LPSTR)cmd,         // コマンドライン
         NULL,               // セキュリティ属性
         NULL,               // スレッド属性
         FALSE,              // ハンドル継承しない
@@ -55,51 +54,71 @@ static void SendInputForEachDevices(const char* input) {
     }
 }
 
+static BOOL innerWindow = FALSE;
+static POINT lastPoint;
+static DWORD lastTime;
+
+// クリックダウン
+static void leftClickDown(const POINT point) {
+    innerWindow = GetAncestor(WindowFromPoint(point), GA_ROOT) == mainWindow;
+
+    if (innerWindow) {
+        RECT rect;
+        GetWindowRect(mainWindow, &rect);
+        rect.top += 33; // 上の縁
+
+        lastPoint.x = point.x - rect.left;
+        lastPoint.y = point.y - rect.top;
+        lastTime = GetTickCount();
+    }
+}
+
+// クリックアップ
+static void leftClickUp(const POINT point) {
+    if (innerWindow) {
+        innerWindow = FALSE;
+
+        RECT rect;
+        GetWindowRect(mainWindow, &rect);
+        rect.top += 33; // 上の縁
+
+        int winW = rect.right - rect.left;
+        int winH = rect.bottom - rect.top;
+
+        POINT newPoint;
+        newPoint.x = point.x - rect.left;
+        newPoint.y = point.y - rect.top;
+
+        char buf[256];
+
+        // タップ
+        if (lastPoint.x == newPoint.x && lastPoint.y == newPoint.y) {
+            int tapX = newPoint.x * devW  / winW;
+            int tapY = newPoint.y * devH / winH;
+            sprintf(buf, "tap %ld %ld", tapX, tapY);
+        }
+
+        // スワイプ
+        else {
+            DWORD newTime = GetTickCount();
+            int startX = lastPoint.x * devW  / winW;
+            int startY = lastPoint.y * devH / winH;
+            int endX = newPoint.x * devW  / winW;
+            int endY = newPoint.y * devH / winH;
+            sprintf(buf, "swipe %ld %ld %ld %ld %ld", startX, startY, endX, endY, newTime - lastTime);
+        }
+
+        SendInputForEachDevices(buf);
+    }
+}
+
 // マウス
 static LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION) {
         PMSLLHOOKSTRUCT p = (PMSLLHOOKSTRUCT)lParam;
-        POINT pt = p->pt;
 
-        if (GetAncestor(WindowFromPoint(p->pt), GA_ROOT) == mainWindow) {
-            RECT rect;
-            GetWindowRect(mainWindow, &rect);
-            rect.top += 33; // 上の縁
-            int winW = rect.right - rect.left;
-            int winH = rect.bottom - rect.top;
-
-            pt.x -= rect.left;
-            pt.y -= rect.top;
-
-            if (wParam == WM_LBUTTONDOWN) {
-                lpt = pt;
-                ltm = GetTickCount();
-                printf("Down: (%ld, %ld) > ", pt.x, pt.y);
-            }
-            else if (wParam == WM_LBUTTONUP) {
-                DWORD tm = GetTickCount();
-                printf("Up: (%ld, %ld)\n", pt.x, pt.y);
-
-                if (lpt.x == pt.x && lpt.y == pt.y) {
-                    int tapX = (double)pt.x * devW  / winW;
-                    int tapY = (double)pt.y * devH / winH;
-
-                    char buf[256];
-                    sprintf(buf, "tap %ld %ld", tapX, tapY);
-                    SendInputForEachDevices(buf);
-                }
-                else {
-                    int startX = (double)lpt.x * devW  / winW;
-                    int startY = (double)lpt.y * devH / winH;
-                    int endX = (double)pt.x * devW  / winW;
-                    int endY = (double)pt.y * devH / winH;
-
-                    char buf[256];
-                    sprintf(buf, "swipe %ld %ld %ld %ld %ld", startX, startY, endX, endY, tm - ltm);
-                    SendInputForEachDevices(buf);
-                }
-            }   
-        }
+        if (wParam == WM_LBUTTONDOWN) leftClickDown(p->pt);
+        else if (wParam == WM_LBUTTONUP) leftClickUp(p->pt);
     }
 
     return CallNextHookEx(mouseHook, nCode, wParam, lParam);
@@ -210,6 +229,7 @@ static LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
             SendInputForEachDevices(buf);
         }
     }
+
     return CallNextHookEx(keyboardHook, nCode, wParam, lParam);
 }
 
