@@ -22,7 +22,7 @@ static Subwindow hSub[64];
 static int subCount = 0;
 
 // Pokebot thread
-static unsigned threadId;
+static DWORD threadId;
 static HANDLE hThread = NULL;
 
 
@@ -173,7 +173,7 @@ static void LaunchPokebot() {
         }
     }
 
-    hThread = (HANDLE)_beginthreadex(NULL, 0, Pokebot, NULL, 0, &threadId);
+    hThread = CreateThread(NULL, 0, Pokebot, NULL, 0, &threadId);
     SetWindowText(hButton, "Stop");
 }
 
@@ -265,7 +265,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindow(
-        "MainWnd", "Pokebot v1.0.0",
+        "MainWnd", "Pokebot v1.1.0",
         WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
         CW_USEDEFAULT, CW_USEDEFAULT, 300, 400,
         NULL, NULL, hInstance, NULL

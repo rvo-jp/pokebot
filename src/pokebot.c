@@ -12,17 +12,46 @@ static POINT lpt = {.x = 0, .y = 0};
 static DWORD ltm = 0;
 
 // コマンド非同期実行
-static void SystemAsync(void* arg) {
-    system((char*)arg);
-    free(arg);
+static void RunCommandAsync(const char* cmd) {
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+
+    ZeroMemory(&si, sizeof(si));
+    ZeroMemory(&pi, sizeof(pi));
+    si.cb = sizeof(si);
+
+    // コンソールを出さずに起動
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+
+    BOOL success = CreateProcessA(
+        NULL,               // 実行ファイル名（cmdで指定するのでNULL）
+        (LPSTR)cmd,         // コマンドライン（書き換えられるためconst外す）
+        NULL,               // セキュリティ属性
+        NULL,               // スレッド属性
+        FALSE,              // ハンドル継承しない
+        CREATE_NO_WINDOW,   // ウィンドウなし
+        NULL,               // 環境変数なし
+        NULL,               // カレントディレクトリ
+        &si,
+        &pi
+    );
+
+    if (success) {
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    }
+    else {
+        printf("CreateProcess failed: %lu\n", GetLastError());
+    }
 }
 
 // 全デバイスに非同期タスク割り当て
 static void SendInputForEachDevices(const char* input) {
     for (int i = 0; i < subLen; i ++) {
-        char* cmd = malloc(256);
+        char cmd[256];
         sprintf(cmd, ".\\platform-tools\\adb -s 127.0.0.1:%s shell input %s", subAddress[i], input);
-        _beginthread(SystemAsync, 0, cmd);
+        RunCommandAsync(cmd);
     }
 }
 
@@ -184,7 +213,7 @@ static LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     return CallNextHookEx(keyboardHook, nCode, wParam, lParam);
 }
 
-unsigned __stdcall Pokebot(void* arg) {
+DWORD WINAPI Pokebot(LPVOID lpParam) {
     mainWindow = FindWindowA(NULL, mainName);
     if (!mainWindow) {
         printf("Error: %s not found\n", mainName);
@@ -194,9 +223,8 @@ unsigned __stdcall Pokebot(void* arg) {
     for (int i = 0; i < subLen; i ++) {
         char cmd[256];
         sprintf(cmd, ".\\platform-tools\\adb connect 127.0.0.1:%s", subAddress[i]);
-        system(cmd);
+        RunCommandAsync(cmd);
     }
-    // system(".\\platform-tools\\adb devices");
 
     mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseProc, NULL, 0);
     keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
@@ -214,6 +242,6 @@ unsigned __stdcall Pokebot(void* arg) {
 
     UnhookWindowsHookEx(mouseHook);
     UnhookWindowsHookEx(keyboardHook);
-    system(".\\platform-tools\\adb disconnect");
+    RunCommandAsync(".\\platform-tools\\adb disconnect");
     return 0;
 }
