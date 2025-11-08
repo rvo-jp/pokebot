@@ -2,9 +2,9 @@
 
 char mainName[256];
 char subAddress[16][16];
-int subLen = 0;
-int devW  = 0;
-int devH = 0;
+int subLen;
+int devW;
+int devH;
 
 static HHOOK mouseHook, keyboardHook;
 static HWND mainWindow;

@@ -165,11 +165,11 @@ static void LaunchPokebot() {
     GetWindowTextA(hHeight, buf, sizeof(buf));
     devH = atoi(buf);
 
+    subLen = 0;
     for (int i = 0; i < subCount; i ++) {
         Subwindow sub = hSub[i];
         if (SendMessage(sub.use, BM_GETCHECK, 0, 0) == BST_CHECKED) {
-            GetWindowTextA(sub.addr, subAddress[subLen], 16);
-            subLen ++;
+            GetWindowTextA(sub.addr, subAddress[subLen ++], 16);
         }
     }
 
@@ -265,7 +265,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindow(
-        "MainWnd", "Pokebot v1.1.0",
+        "MainWnd", "Pokebot v1.2.1",
         WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
         CW_USEDEFAULT, CW_USEDEFAULT, 300, 400,
         NULL, NULL, hInstance, NULL
