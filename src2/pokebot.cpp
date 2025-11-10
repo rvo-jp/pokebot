@@ -10,24 +10,27 @@ static HHOOK mouseHook, keyboardHook;
 static thread hThread;
 
 static vector<Bot> bots;
-static bool isLastClickInside = false;
-static Bot *lastBot;
+static Bot *lastBot = nullptr;
 static POINT lastPoint;
 static DWORD lastTime;
 
 // クリックダウン
 static void leftClickDown(const POINT point) {
-
-    isLastClickInside = false;
     for (auto& bot : bots) {
         if (bot.isInside(point)) {
-            isLastClickInside = true;
-            lastBot = &bot;
+            lastBot = const_cast<Bot*>(&bot);
             lastPoint = bot.getRelativePos(point, devW, devH);
             lastTime = GetTickCount();
             break;
         }
     }
+}
+
+// クリックアップ
+static void leftClickUp(const POINT point) {
+    if (!lastBot) return;
+    POINT newPoint = lastBot->getRelativePos(point, devW, devH);
+    
 }
 
 // マウス
