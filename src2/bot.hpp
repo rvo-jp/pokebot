@@ -7,10 +7,15 @@
 using namespace std;
 
 class Bot {
+public:
+    bool isInside(const POINT point);
+    POINT getRelativePos(const POINT point, int devW, int devH);
+
 private:
     string port;
     HWND window;
     bool getWindow(const string label);
+    void inputShell(const string input);
     void runCommandAsync(const string command);
 };
 

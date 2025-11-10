@@ -1,4 +1,22 @@
-#include <bot.h>
+#include "bot.hpp"
+
+bool Bot::isInside(POINT point) {
+    return GetAncestor(WindowFromPoint(point), GA_ROOT) == window;
+}
+
+POINT Bot::getRelativePos(const POINT point, int devW, int devH) {
+    RECT rect;
+    GetWindowRect(window, &rect);
+    rect.top += 33; // 上の縁
+
+    int width = rect.right - rect.left;
+    int height = rect.bottom - rect.top;
+    
+    POINT pos;
+    pos.x = (point.x - rect.left) * devW  / width;
+    pos.y = (point.y - rect.top) * devH / height;
+    return pos;
+}
 
 bool Bot::getWindow(const string label) {
     window = FindWindowA(NULL, label.c_str());
@@ -34,3 +52,9 @@ void Bot::runCommandAsync(const string command) {
         printf("CreateProcess failed: %lu\n", GetLastError());
     }
 }
+
+// adbタスク
+void Bot::inputShell(const string input) {
+    runCommandAsync(".\\platform-tools\\adb -s 127.0.0.1:" + port + " shell input " + input);
+}
+
