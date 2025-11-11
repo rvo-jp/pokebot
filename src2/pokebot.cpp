@@ -1,53 +1,31 @@
-#include <thread>
-#include <vector>
-#include "bot.hpp"
+#include "pokebot.hpp"
 
-using namespace std;
 
-int devW, devH;
 
-static HHOOK mouseHook, keyboardHook;
-static thread hThread;
+// シングルインスタンス
+Pokebot& Pokebot::getInstance() {
+    static Pokebot instance;
+    return instance;
+}
 
-static vector<Bot> bots;
-static Bot *lastBot = nullptr;
-static POINT lastPoint;
-static DWORD lastTime;
+// 初回生成時に自動起動
+Pokebot::Pokebot() {
+    worker = thread(&Pokebot::hookThread, this);
+}
 
-// クリックダウン
-static void leftClickDown(const POINT point) {
-    for (auto& bot : bots) {
-        if (bot.isInside(point)) {
-            lastBot = const_cast<Bot*>(&bot);
-            lastPoint = bot.getRelativePos(point, devW, devH);
-            lastTime = GetTickCount();
-            break;
-        }
+// 解放時に自動終了
+Pokebot::~Pokebot() {
+    DWORD threadId = GetThreadId(worker.native_handle());
+    PostThreadMessage(threadId, WM_QUIT, 0, 0);
+    if (worker.joinable()) {
+        worker.join();
     }
 }
 
-// クリックアップ
-static void leftClickUp(const POINT point) {
-    if (!lastBot) return;
-    POINT newPoint = lastBot->getRelativePos(point, devW, devH);
-    
-}
-
-// マウス
-static LRESULT CALLBACK mouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
-    if (nCode == HC_ACTION) {
-        PMSLLHOOKSTRUCT p = (PMSLLHOOKSTRUCT)lParam;
-
-        if (wParam == WM_LBUTTONDOWN) leftClickDown(p->pt);
-        else if (wParam == WM_LBUTTONUP) leftClickUp(p->pt);
-    }
-
-    return CallNextHookEx(mouseHook, nCode, wParam, lParam);
-}
-
-static void hookThread() {
+// スレッド
+void Pokebot::hookThread() {
     mouseHook = SetWindowsHookEx(WH_MOUSE_LL, mouseProc, NULL, 0);
-    keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
+    keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, keyboardProc, NULL, 0);
     
     if (!mouseHook || !keyboardHook) {
         printf("SetWindowsHookEx failed: %lu\n", GetLastError());
@@ -63,15 +41,62 @@ static void hookThread() {
     UnhookWindowsHookEx(keyboardHook);
 }
 
-void startPokebot() {
-    hThread = thread(hookThread);
-}
+// マウスプロシージャ
+LRESULT CALLBACK Pokebot::mouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    Pokebot& obj = Pokebot::getInstance();
 
-void endPokebot() {
-    DWORD threadId = GetThreadId(hThread.native_handle());
-    PostThreadMessage(threadId, WM_QUIT, 0, 0);
+    if (nCode == HC_ACTION) {
+        PMSLLHOOKSTRUCT p = (PMSLLHOOKSTRUCT)lParam;
 
-    if (hThread.joinable()) {
-        hThread.join();
+        if (wParam == WM_LBUTTONDOWN) { // クリックダウン
+            obj.lastBot = nullptr;
+            
+            for (auto& bot : obj.bots) {
+                if (bot.isInside(p->pt)) {
+                    obj.lastBot = const_cast<Bot*>(&bot);
+                    obj.lastPos = bot.getRelativePos(p->pt, obj.devW, obj.devH);
+                    obj.lastTime = GetTickCount();
+                    break;
+                }
+            }
+        }
+        else if (wParam == WM_LBUTTONUP) { //　クリックアップ
+            if (obj.lastBot == nullptr) return;
+            
+            POINT pos = obj.lastBot->getRelativePos(p->pt, obj.devW, obj.devH);
+            DWORD newTime = GetTickCount();
+            
+            for (auto& bot : obj.bots) {
+                if (&bot == obj.lastBot) continue;
+            
+                if (obj.lastPos.x == pos.x && obj.lastPos.y == pos.y) {
+                    bot.tap(pos);
+                }
+                else {
+                    bot.swipe(obj.lastPos, pos, newTime - obj.lastTime);
+                }
+            }
+        }
     }
+
+    return CallNextHookEx(obj.mouseHook, nCode, wParam, lParam);
 }
+
+// キーボードプロシージャ
+LRESULT CALLBACK Pokebot::keyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    Pokebot& obj = Pokebot::getInstance();
+    
+    if (nCode == HC_ACTION) {
+        KBDLLHOOKSTRUCT* kbd = (KBDLLHOOKSTRUCT*)lParam;
+
+        if (wParam == WM_KEYDOWN) {
+            for (auto& bot : obj.bots) {
+                if (bot.isForground()) continue;
+                bot.keyevent(kbd->vkCode);
+            }
+        }
+    }
+
+    return CallNextHookEx(obj.keyboardHook, nCode, wParam, lParam);
+}
+
