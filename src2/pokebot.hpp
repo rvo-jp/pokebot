@@ -1,6 +1,5 @@
 #pragma once
 #include <windows.h>
-#include <thread>
 #include <vector>
 #include "bot.hpp"
 
@@ -11,6 +10,9 @@ public:
     // シングルトンインスタンス取得
     static Pokebot& getInstance();
 
+    static void connect(const string& label, const string& port);
+    static void disconnect(const string& port);
+
 private:
     Pokebot();
     ~Pokebot();
@@ -19,18 +21,18 @@ private:
     Pokebot(const Pokebot&) = delete;
     Pokebot& operator=(const Pokebot&) = delete;
 
-    thread worker;
+    HANDLE hThread;
     HHOOK mouseHook;
     HHOOK keyboardHook;
-    int devW;
-    int devH;
+    int devW = 540;
+    int devH = 960;
 
     vector<Bot> bots;
     Bot* lastBot;
     POINT lastPos;
     DWORD lastTime;
 
-    void hookThread();
+    static DWORD WINAPI hookThread(LPVOID lpParam);
     static LRESULT CALLBACK mouseProc(int nCode, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK keyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 };

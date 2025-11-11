@@ -1,6 +1,21 @@
 #include "pokebot.hpp"
+ 
+void Pokebot::connect(const string& label, const string& port) {
+    Pokebot& obj = Pokebot::getInstance();
+    obj.bots.emplace_back(label, port);
+}
 
+void Pokebot::disconnect(const string& port) {
+    Pokebot& obj = Pokebot::getInstance();
 
+    for (auto it = obj.bots.begin(); it != obj.bots.end(); ++it) {
+        if (it->getPort() == port) {
+            it->disconnect();
+            obj.bots.erase(it);
+            break;
+        }
+    }
+}
 
 // シングルインスタンス
 Pokebot& Pokebot::getInstance() {
@@ -10,25 +25,30 @@ Pokebot& Pokebot::getInstance() {
 
 // 初回生成時に自動起動
 Pokebot::Pokebot() {
-    worker = thread(&Pokebot::hookThread, this);
+    hThread = CreateThread(NULL, 0, Pokebot::hookThread, NULL, 0, NULL);
 }
 
 // 解放時に自動終了
 Pokebot::~Pokebot() {
-    DWORD threadId = GetThreadId(worker.native_handle());
-    PostThreadMessage(threadId, WM_QUIT, 0, 0);
-    if (worker.joinable()) {
-        worker.join();
+    for (auto& bot : bots) {
+        bot.disconnect();
     }
+
+    DWORD threadId = GetThreadId(hThread);
+    PostThreadMessage(threadId, WM_QUIT, 0, 0);
+    WaitForSingleObject(hThread, INFINITE);
+    CloseHandle(hThread);
 }
 
 // スレッド
-void Pokebot::hookThread() {
-    mouseHook = SetWindowsHookEx(WH_MOUSE_LL, mouseProc, NULL, 0);
-    keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, keyboardProc, NULL, 0);
+DWORD WINAPI Pokebot::hookThread(LPVOID lpParam) {
+    Pokebot& obj = Pokebot::getInstance();
+
+    obj.mouseHook = SetWindowsHookEx(WH_MOUSE_LL, mouseProc, NULL, 0);
+    obj.keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, keyboardProc, NULL, 0);
     
-    if (!mouseHook || !keyboardHook) {
-        printf("SetWindowsHookEx failed: %lu\n", GetLastError());
+    if (!obj.mouseHook || !obj.keyboardHook) {
+        throw runtime_error("SetWindowsHookEx failed: "  + to_string(GetLastError()));
     }
 
     MSG msg;
@@ -37,8 +57,9 @@ void Pokebot::hookThread() {
         DispatchMessage(&msg);
     }
 
-    UnhookWindowsHookEx(mouseHook);
-    UnhookWindowsHookEx(keyboardHook);
+    UnhookWindowsHookEx(obj.mouseHook);
+    UnhookWindowsHookEx(obj.keyboardHook);
+    return 0;
 }
 
 // マウスプロシージャ
@@ -61,19 +82,19 @@ LRESULT CALLBACK Pokebot::mouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
             }
         }
         else if (wParam == WM_LBUTTONUP) { //　クリックアップ
-            if (obj.lastBot == nullptr) return;
-            
-            POINT pos = obj.lastBot->getRelativePos(p->pt, obj.devW, obj.devH);
-            DWORD newTime = GetTickCount();
-            
-            for (auto& bot : obj.bots) {
-                if (&bot == obj.lastBot) continue;
-            
-                if (obj.lastPos.x == pos.x && obj.lastPos.y == pos.y) {
-                    bot.tap(pos);
-                }
-                else {
-                    bot.swipe(obj.lastPos, pos, newTime - obj.lastTime);
+            if (obj.lastBot != nullptr) {
+                POINT pos = obj.lastBot->getRelativePos(p->pt, obj.devW, obj.devH);
+                DWORD newTime = GetTickCount();
+                
+                for (auto& bot : obj.bots) {
+                    if (&bot == obj.lastBot) continue;
+                
+                    if (obj.lastPos.x == pos.x && obj.lastPos.y == pos.y) {
+                        bot.tap(pos);
+                    }
+                    else {
+                        bot.swipe(obj.lastPos, pos, newTime - obj.lastTime);
+                    }
                 }
             }
         }

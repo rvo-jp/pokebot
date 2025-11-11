@@ -1,5 +1,40 @@
 #include "bot.hpp"
 
+Bot::Bot(const string& label, const string& _port) {
+    port = _port;
+    window = FindWindowA(NULL, label.c_str());
+    if (!window) {
+        throw runtime_error("Window '" + label + "'not found");
+    }
+
+    // runCommandAsync(".\\platform-tools\\adb connect 127.0.0.1:" + port);
+    runCommand(".\\platform-tools\\adb connect 127.0.0.1:" + port);
+    string output = runCommand(".\\platform-tools\\adb -s 127.0.0.1:" + port + " shell wm size");
+    
+    // Physical size: 1080x1920
+    regex re(R"((\d+)x(\d+))");
+    smatch match;
+
+    if (regex_search(output, match, re)) {
+        width  = stoi(match[1].str());
+        height = stoi(match[2].str());
+    }
+    else {
+        throw runtime_error("Failed to parse screen size from output: " + output);
+    }
+
+    // デバッグ表示
+    cout << "[DEBUG] Connected to " << label << " (" << width << "x" << height << ")" << endl;
+}
+
+void Bot::disconnect() {
+    runCommandAsync(".\\platform-tools\\adb disconnect 127.0.0.1:" + port);
+}
+
+string& Bot::getPort() {
+    return port;
+}
+
 bool Bot::isInside(POINT point) {
     return GetAncestor(WindowFromPoint(point), GA_ROOT) == window;
 }
@@ -130,43 +165,125 @@ void Bot::keyevent(const DWORD key) {
 
 
 
-bool Bot::getWindow(const string label) {
-    window = FindWindowA(NULL, label.c_str());
+
+// adbタスク
+void Bot::inputShell(const string& input) {
+    runCommandAsync(".\\platform-tools\\adb -s 127.0.0.1:" + port + " shell input " + input);
 }
 
+
+
 // コマンド非同期実行
-void Bot::runCommandAsync(const string command) {
+void Bot::runCommandAsync(const string& command) {
     STARTUPINFOA si{};
     PROCESS_INFORMATION pi{};
     si.cb = sizeof(si);
-
-    // コンソールを出さない設定
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
 
+    // commandは書き換えられる可能性があるためコピーする
+    vector<char> cmdBuffer(command.begin(), command.end());
+    cmdBuffer.push_back('\0'); // null終端を追加
+
+    // cout << "[DEBUG] Cmd: " << command << endl;
+
     BOOL success = CreateProcessA(
-        nullptr,               // 実行ファイル名（commandで指定するのでNULL）
-        const_cast<char *>(command.c_str()),         // コマンドライン
+        nullptr,                // 実行ファイル名（commandで指定するのでNULL）
+        cmdBuffer.data(),       // コマンドライン（コピーを渡す）
         nullptr,                // セキュリティ属性
         nullptr,                // スレッド属性
         FALSE,                  // ハンドル継承しない
         CREATE_NO_WINDOW,       // ウィンドウなし
         nullptr,                // 環境変数なし
         nullptr,                // カレントディレクトリ
-        &si, &pi
+        &si,
+        &pi
     );
 
-    if (success) {
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
+    if (!success) {
+        DWORD err = GetLastError();
+        throw runtime_error("CreateProcessA failed: error code " + to_string(err));
+        return;
     }
-    else {
-        printf("CreateProcess failed: %lu\n", GetLastError());
-    }
+
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
 }
 
-// adbタスク
-void Bot::inputShell(const string input) {
-    runCommandAsync(".\\platform-tools\\adb -s 127.0.0.1:" + port + " shell input " + input);
-}
+// コマンド同期実行（完了を待って出力を返す）
+string Bot::runCommand(const string& command) {
+    SECURITY_ATTRIBUTES sa{};
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.bInheritHandle = TRUE; // パイプを子プロセスが継承できるように
+    sa.lpSecurityDescriptor = nullptr;
 
+    // 標準出力用パイプ作成
+    HANDLE hRead = nullptr;
+    HANDLE hWrite = nullptr;
+    if (!CreatePipe(&hRead, &hWrite, &sa, 0)) {
+        throw runtime_error("CreatePipe failed: " + to_string(GetLastError()));
+    }
+
+    // 書き込みハンドルを継承しない設定
+    SetHandleInformation(hRead, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOA si{};
+    PROCESS_INFORMATION pi{};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+    si.hStdOutput = hWrite;
+    si.hStdError  = hWrite;  // 標準エラーもまとめて取得
+    si.wShowWindow = SW_HIDE;
+
+    // CreateProcessA に渡すためにコマンドをコピー
+    vector<char> cmdBuffer(command.begin(), command.end());
+    cmdBuffer.push_back('\0');
+
+    BOOL success = CreateProcessA(
+        nullptr,
+        cmdBuffer.data(),
+        nullptr,
+        nullptr,
+        TRUE,               // 標準ハンドル継承を有効に
+        CREATE_NO_WINDOW,   // コンソール非表示
+        nullptr,
+        nullptr,
+        &si,
+        &pi
+    );
+
+    CloseHandle(hWrite); // 親側の書き込みハンドルは不要
+
+    if (!success) {
+        DWORD err = GetLastError();
+        CloseHandle(hRead);
+        throw runtime_error("CreateProcessA failed: error code " + to_string(err));
+    }
+
+    // 標準出力を読み取る
+    string output;
+    char buffer[4096];
+    DWORD bytesRead = 0;
+
+    while (ReadFile(hRead, buffer, sizeof(buffer) - 1, &bytesRead, nullptr) && bytesRead > 0) {
+        buffer[bytesRead] = '\0';
+        output += buffer;
+    }
+
+    // プロセス終了を待つ
+    WaitForSingleObject(pi.hProcess, INFINITE);
+
+    DWORD exitCode = 0;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+
+    // リソースを開放
+    CloseHandle(hRead);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    if (exitCode != 0) {
+        throw runtime_error("Process exited with code " + to_string(exitCode) + ": " + output);
+    }
+
+    return output;
+}
