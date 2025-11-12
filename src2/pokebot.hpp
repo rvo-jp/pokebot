@@ -7,15 +7,15 @@ using namespace std;
 
 class Pokebot {
 public:
-    // シングルトンインスタンス取得
-    static Pokebot& getInstance();
-
     static void connect(const string& label, const string& port);
     static void disconnect(const string& port);
 
 private:
     Pokebot();
     ~Pokebot();
+    
+    // シングルトンインスタンス取得
+    static Pokebot& getInstance();
 
     // コピー禁止
     Pokebot(const Pokebot&) = delete;

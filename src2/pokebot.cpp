@@ -1,4 +1,5 @@
 #include "pokebot.hpp"
+
  
 void Pokebot::connect(const string& label, const string& port) {
     Pokebot& obj = Pokebot::getInstance();
@@ -16,6 +17,7 @@ void Pokebot::disconnect(const string& port) {
         }
     }
 }
+
 
 // シングルインスタンス
 Pokebot& Pokebot::getInstance() {
