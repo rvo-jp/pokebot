@@ -1,1 +1,0 @@
-gcc bot.c -o bot.exe -lgdi32 -luser32

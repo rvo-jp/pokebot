@@ -1,1 +1,0 @@
-gcc gui.c -o gui.exe -mwindows
