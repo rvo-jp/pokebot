@@ -11,17 +11,15 @@ using namespace std;
 class Bot {
 public:
     Bot(const string& label, const string& port);
+    ~Bot();
 
     bool isInside(const POINT point);
     bool isForground();
-    POINT getRelativePos(const POINT point, int devW, int devH);
+    POINT getRelativePos(const POINT point);
     
     void tap(const POINT pos);
     void swipe(const POINT startPos, const POINT endPos, DWORD time);
     void keyevent(const DWORD key);
-    void disconnect();
-
-    string& getPort();
     
 private:
     string port;

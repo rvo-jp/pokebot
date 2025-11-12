@@ -27,13 +27,10 @@ Bot::Bot(const string& label, const string& _port) {
     cout << "[DEBUG] Connected to " << label << " (" << width << "x" << height << ")" << endl;
 }
 
-void Bot::disconnect() {
+Bot::~Bot() {
     runCommandAsync(".\\platform-tools\\adb disconnect 127.0.0.1:" + port);
 }
 
-string& Bot::getPort() {
-    return port;
-}
 
 bool Bot::isInside(POINT point) {
     return GetAncestor(WindowFromPoint(point), GA_ROOT) == window;
@@ -43,26 +40,29 @@ bool Bot::isForground() {
     return GetForegroundWindow() == window;
 }
 
-POINT Bot::getRelativePos(const POINT point, int devW, int devH) {
+static const int MAG = 10000;
+
+POINT Bot::getRelativePos(const POINT point) {
     RECT rect;
     GetWindowRect(window, &rect);
     rect.top += 33; // 上の縁
 
-    int width = rect.right - rect.left;
-    int height = rect.bottom - rect.top;
+    int winW = rect.right - rect.left;
+    int winH = rect.bottom - rect.top;
     
     POINT pos;
-    pos.x = (point.x - rect.left) * devW  / width;
-    pos.y = (point.y - rect.top) * devH / height;
+    pos.x = (point.x - rect.left) * MAG  / winW;
+    pos.y = (point.y - rect.top) * MAG / winH;
     return pos;
 }
 
 void Bot::tap(const POINT pos) {
-    inputShell("tap " + to_string(pos.x) + " " + to_string(pos.y));
+    inputShell("tap " + to_string(pos.x * width / MAG) + " " + to_string(pos.y * height / MAG));
 }
 
 void Bot::swipe(const POINT startPos, const POINT endPos, DWORD time) {
-    inputShell("swipe " + to_string(startPos.x) + " " + to_string(startPos.y) + " " + to_string(endPos.x) + " " + to_string(endPos.y) + to_string(time));
+    inputShell(
+        "swipe " + to_string(startPos.x * width / MAG) + " " + to_string(startPos.y * height / MAG) + " " + to_string(endPos.x * width / MAG) + " " + to_string(endPos.y * height / MAG) + " " + to_string(time));
 }
 
 // US配列前提
@@ -185,7 +185,7 @@ void Bot::runCommandAsync(const string& command) {
     vector<char> cmdBuffer(command.begin(), command.end());
     cmdBuffer.push_back('\0'); // null終端を追加
 
-    // cout << "[DEBUG] Cmd: " << command << endl;
+    cout << "[DEBUG] runCommandAsync: " << command << endl;
 
     BOOL success = CreateProcessA(
         nullptr,                // 実行ファイル名（commandで指定するのでNULL）
@@ -238,6 +238,8 @@ string Bot::runCommand(const string& command) {
     // CreateProcessA に渡すためにコマンドをコピー
     vector<char> cmdBuffer(command.begin(), command.end());
     cmdBuffer.push_back('\0');
+
+    cout << "[DEBUG] runCommand: " << command << endl;
 
     BOOL success = CreateProcessA(
         nullptr,

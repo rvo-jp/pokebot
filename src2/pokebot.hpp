@@ -7,8 +7,8 @@ using namespace std;
 
 class Pokebot {
 public:
-    static void connect(const string& label, const string& port);
-    static void disconnect(const string& port);
+    static Bot *connect(const string& label, const string& port);
+    static void disconnect(Bot* botPtr);
 
 private:
     Pokebot();
@@ -24,13 +24,13 @@ private:
     HANDLE hThread;
     HHOOK mouseHook;
     HHOOK keyboardHook;
-    int devW = 540;
-    int devH = 960;
 
-    vector<Bot> bots;
-    Bot* lastBot;
+    vector<unique_ptr<Bot>> bots;
+    Bot* lastBotPtr;
     POINT lastPos;
     DWORD lastTime;
+
+    bool pause = false;
 
     static DWORD WINAPI hookThread(LPVOID lpParam);
     static LRESULT CALLBACK mouseProc(int nCode, WPARAM wParam, LPARAM lParam);

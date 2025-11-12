@@ -21,49 +21,63 @@ const int ID_BTN_REMOVE = 1002;
 
 // Element 構造体
 struct Element {
-    HWND hEdit;
+    HWND hEditLabel;
+    HWND hEditPort;
     HWND hButton;
     int y;
     int id;
+    Bot *botPtr;
 };
 
 vector<Element> elements;
 int nextElementId = 2000;
 
-// --- 関数 ---
+
+void ErrorMessage(HWND hwnd, const char *e) {
+    MessageBoxA(hwnd, e, "ERROR", MB_OK);
+}
+
 void UpdateScrollArea(HWND hwnd) {
     for (auto& el : elements) {
-        MoveWindow(el.hEdit, 10, el.y - scrollPos, 200, 25, TRUE);
-        MoveWindow(el.hButton, 220, el.y - scrollPos, 60, 25, TRUE);
+        MoveWindow(el.hEditLabel, 0, el.y - scrollPos, 170, 25, TRUE);
+        MoveWindow(el.hEditPort, 180, el.y - scrollPos, 60, 25, TRUE);
+        MoveWindow(el.hButton, 250, el.y - scrollPos, 50, 25, TRUE);
     }
 
     int scrollMax = max(0, (int)elements.size() * elementHeight - scrollAreaHeight);
     SetScrollRange(hwnd, SB_VERT, 0, scrollMax, TRUE);
     SetScrollPos(hwnd, SB_VERT, scrollPos, TRUE);
+    InvalidateRect(hwnd, NULL, TRUE); // 画面ガビガビ防止
 }
 
-void AddElement(HWND hwnd, const std::string& label, const std::string& port) {
+void AddElement(HWND hwnd, const string& label, const string& port) {
     int y = elements.size() * elementHeight;
     int id = nextElementId++;
 
-    HWND hEdit = CreateWindow("EDIT", label.c_str(),
-        WS_CHILD | WS_VISIBLE | ES_LEFT | WS_BORDER,
-        0, y, 200, 25,
-        hwnd, NULL, hInst, NULL);
+    HWND hEditLabel = CreateWindow("EDIT", label.c_str(),
+            WS_CHILD | WS_VISIBLE | ES_LEFT | WS_BORDER,
+            0, y, 170, 25,
+            hwnd, NULL, hInst, NULL);
 
-    HWND hBtn = CreateWindow("BUTTON", "CN",
-        WS_CHILD | WS_VISIBLE | WS_BORDER,
-        220, y, 60, 25,
-        hwnd, (HMENU)MAKEINTRESOURCE(id), hInst, NULL);
+    HWND hEditPort = CreateWindow("EDIT", port.c_str(),
+            WS_CHILD | WS_VISIBLE | ES_LEFT | WS_BORDER,
+            180, y, 60, 25,
+            hwnd, NULL, hInst, NULL);
 
-    elements.push_back({ hEdit, hBtn, y, id });
+    HWND hButton = CreateWindow("BUTTON", "ON",
+            WS_CHILD | WS_VISIBLE | WS_BORDER,
+            250, y, 50, 25,
+            hwnd, (HMENU)MAKEINTRESOURCE(id), hInst, NULL);
+
+    elements.push_back({ hEditLabel, hEditPort, hButton, y, id, nullptr });
     UpdateScrollArea(hwnd);
 }
 
 void RemoveElement() {
     if (elements.empty()) return;
     auto el = elements.back();
-    DestroyWindow(el.hEdit);
+    DestroyWindow(el.hEditLabel);
+    DestroyWindow(el.hEditPort);
     DestroyWindow(el.hButton);
     elements.pop_back();
     UpdateScrollArea(hwndScroll);
@@ -75,7 +89,8 @@ LRESULT CALLBACK ScrollWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
     case WM_CREATE: {
         ifstream file("config.txt");
         if (!file.is_open()) {
-            throw runtime_error("Failed to open config.txt");
+            ErrorMessage(hwnd, "Failed to open 'config.txt'");
+            break;
         }
 
         string line;
@@ -88,10 +103,10 @@ LRESULT CALLBACK ScrollWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             if (getline(ss, label, ':') && getline(ss, port)) {
                 AddElement(hwnd, label, port);
             }
-            else {
-                throw runtime_error("Invalid line format: " + line);
-            }
+            else ErrorMessage(hwnd, ("Invalid config format: " + line).c_str());
         }
+        file.close();
+
         break;
     }
 
@@ -100,8 +115,25 @@ LRESULT CALLBACK ScrollWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         for (auto& el : elements) {
             if (el.id == id) {
                 char buf[128];
-                GetWindowTextA(el.hEdit, buf, sizeof(buf));
-                MessageBoxA(hwnd, buf, "Element Button", MB_OK);
+                GetWindowTextA(el.hEditLabel, buf, sizeof(buf));
+                string label(buf);
+                GetWindowTextA(el.hEditPort, buf, sizeof(buf));
+                string port(buf);
+
+                try {
+                    if (el.botPtr == nullptr) {
+                        el.botPtr = Pokebot::connect(label, port);
+                        SetWindowTextA(el.hButton, "OFF");
+                    }
+                    else {
+                        Pokebot::disconnect(el.botPtr);
+                        el.botPtr = nullptr;
+                        SetWindowTextA(el.hButton, "ON");
+                    }
+                }
+                catch (const exception& e) {
+                    ErrorMessage(hwnd, e.what());
+                }
                 break;
             }
         }
@@ -132,7 +164,6 @@ LRESULT CALLBACK ScrollWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         if (scrollPos < 0) scrollPos = 0;
         if (scrollPos > maxScroll) scrollPos = maxScroll;
         UpdateScrollArea(hwndScroll);
-        InvalidateRect(hwnd, NULL, TRUE); // 画面ガビガビ防止
         break;
     }
 
@@ -161,9 +192,28 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         break;
     }
 
-    case WM_DESTROY:
+    case WM_DESTROY: {
+        ofstream file("config.txt");
+        if (!file.is_open()) {
+            ErrorMessage(hwnd, "Failed to open 'config.txt'");
+            break;;
+        }
+
+        for (auto& el : elements) {
+            char buf[128];
+            GetWindowTextA(el.hEditLabel, buf, sizeof(buf));
+            string label(buf);
+            GetWindowTextA(el.hEditPort, buf, sizeof(buf));
+            string port(buf);
+
+            file << label << ":" << port << "\n";
+        }
+        file.close();
+
         PostQuitMessage(0);
         break;
+    }
+
 
     default:
         return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -186,8 +236,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     RegisterClass(&wc);
 
     hwndMain = CreateWindowEx(0, CLASS_NAME, "Pokebot v2.0.0",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 400, 450,
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+        CW_USEDEFAULT, CW_USEDEFAULT, 350, 400,
         NULL, NULL, hInstance, NULL);
 
     // ScrollArea ウィンドウクラス
@@ -202,7 +252,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // ScrollArea 作成
     hwndScroll = CreateWindowEx(0, "ScrollArea", "",
         WS_CHILD | WS_VISIBLE | WS_VSCROLL,
-        10, 50, 370, scrollAreaHeight,
+        10, 50, 320, scrollAreaHeight,
         hwndMain, NULL, hInstance, NULL);
 
     ShowWindow(hwndMain, nCmdShow);
