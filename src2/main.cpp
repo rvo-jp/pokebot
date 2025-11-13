@@ -11,13 +11,11 @@ HINSTANCE hInst;
 HWND hwndMain;
 HWND hwndScroll;
 
-const int scrollAreaHeight = 300;
+const int scrollAreaHeight = 210;
 const int elementHeight = 30;
 int scrollPos = 0;
 
-// + / - ボタンID
-const int ID_BTN_ADD = 1001;
-const int ID_BTN_REMOVE = 1002;
+
 
 // Element 構造体
 struct Element {
@@ -34,7 +32,7 @@ int nextElementId = 2000;
 
 
 void ErrorMessage(HWND hwnd, const char *e) {
-    MessageBoxA(hwnd, e, "ERROR", MB_OK);
+    MessageBoxA(hwnd, e, "Error", MB_OK);
 }
 
 void UpdateScrollArea(HWND hwnd) {
@@ -97,13 +95,18 @@ LRESULT CALLBACK ScrollWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         while (getline(file, line)) {
             if (line.empty()) continue;
 
-            stringstream ss(line);
             string label, port;
+            size_t pos = line.find(':');
 
-            if (getline(ss, label, ':') && getline(ss, port)) {
+            if (pos != string::npos) {
+                label = line.substr(0, pos);
+                port  = line.substr(pos + 1);
+
                 AddElement(hwnd, label, port);
             }
-            else ErrorMessage(hwnd, ("Invalid config format: " + line).c_str());
+            else {
+                ErrorMessage(hwnd, ("Invalid format: " + line).c_str());
+            }
         }
         file.close();
 
@@ -173,16 +176,28 @@ LRESULT CALLBACK ScrollWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
     return 0;
 }
 
+// + / - ボタンID
+const int ID_BTN_ADD = 1001;
+const int ID_BTN_REMOVE = 1002;
+
 // --- Main ウィンドウプロシージャ ---
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
     case WM_CREATE:
         // + ボタン
-        CreateWindowEx(0, "BUTTON", "+", WS_CHILD | WS_VISIBLE,
-            10, 10, 30, 30, hwnd, (HMENU)ID_BTN_ADD, hInst, NULL);
+        CreateWindow(
+            "BUTTON", "Add", WS_CHILD | WS_VISIBLE | WS_BORDER,
+            10, 230, 50, 30,
+            hwnd, (HMENU)ID_BTN_ADD, hInst, NULL
+        );
+        
         // - ボタン
-        CreateWindowEx(0, "BUTTON", "-", WS_CHILD | WS_VISIBLE,
-            50, 10, 30, 30, hwnd, (HMENU)ID_BTN_REMOVE, hInst, NULL);
+        CreateWindow(
+            "BUTTON", "Remove", WS_CHILD | WS_VISIBLE |WS_BORDER,
+            70, 230, 70, 30,
+            hwnd, (HMENU)ID_BTN_REMOVE, hInst, NULL
+        );
+
         break;
 
     case WM_COMMAND: {
@@ -237,7 +252,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     hwndMain = CreateWindowEx(0, CLASS_NAME, "Pokebot v2.0.0",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT, 350, 400,
+        CW_USEDEFAULT, CW_USEDEFAULT, 340, 300,
         NULL, NULL, hInstance, NULL);
 
     // ScrollArea ウィンドウクラス
@@ -252,7 +267,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // ScrollArea 作成
     hwndScroll = CreateWindowEx(0, "ScrollArea", "",
         WS_CHILD | WS_VISIBLE | WS_VSCROLL,
-        10, 50, 320, scrollAreaHeight,
+        10, 10, 320, scrollAreaHeight,
         hwndMain, NULL, hInstance, NULL);
 
     ShowWindow(hwndMain, nCmdShow);
