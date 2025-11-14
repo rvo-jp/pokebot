@@ -5,9 +5,12 @@ li:5575
 mrs:5665
 mono:5645
 mono2:5715
+akagi:5655
+haruka:5755
+leaf:5735
 bot0:5675
 bot1:5745
 bot2:5695
-bot3:5735
-bot4:5755
+bot3:
+bot4:5765
 bot5:5725

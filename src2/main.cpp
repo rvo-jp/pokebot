@@ -17,7 +17,6 @@ int scrollPos = 0;
 
 
 
-// Element 構造体
 struct Element {
     HWND hEditLabel;
     HWND hEditPort;
@@ -250,7 +249,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     RegisterClass(&wc);
 
-    hwndMain = CreateWindowEx(0, CLASS_NAME, "Pokebot v2.0.0",
+    hwndMain = CreateWindowEx(0, CLASS_NAME, "Pokebot v2.0.1",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 340, 300,
         NULL, NULL, hInstance, NULL);

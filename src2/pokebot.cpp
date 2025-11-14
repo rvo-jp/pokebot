@@ -112,7 +112,7 @@ LRESULT CALLBACK Pokebot::keyboardProc(int nCode, WPARAM wParam, LPARAM lParam) 
     if (nCode == HC_ACTION) {
         KBDLLHOOKSTRUCT* kbd = (KBDLLHOOKSTRUCT*)lParam;
 
-        if (wParam == WM_KEYDOWN) {
+        if (wParam == WM_KEYDOWN && !obj.pause) {
             for (auto& bot : obj.bots) {
                 if (bot->isForground()) continue;
                 bot->keyevent(kbd->vkCode);

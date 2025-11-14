@@ -289,3 +289,45 @@ string Bot::runCommand(const string& command) {
 
     return output;
 }
+
+
+// vector<unsigned char> execAdbScreencap() {
+//     SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+//     HANDLE readPipe, writePipe;
+
+//     CreatePipe(&readPipe, &writePipe, &sa, 0);
+//     SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
+
+//     PROCESS_INFORMATION pi;
+//     STARTUPINFOA si = { sizeof(STARTUPINFOA) };
+//     si.dwFlags = STARTF_USESTDHANDLES;
+//     si.hStdOutput = writePipe;
+//     si.hStdError = writePipe;
+
+//     char cmd[] = "adb exec-out screencap -p";
+
+//     CreateProcessA(
+//         NULL, cmd, NULL, NULL, TRUE,
+//         CREATE_NO_WINDOW, NULL, NULL,
+//         &si, &pi
+//     );
+
+//     CloseHandle(writePipe);
+
+//     vector<unsigned char> buffer;
+//     unsigned char temp[4096];
+//     DWORD bytesRead;
+
+//     while (ReadFile(readPipe, temp, sizeof(temp), &bytesRead, NULL) && bytesRead > 0) {
+//         buffer.insert(buffer.end(), temp, temp + bytesRead);
+//     }
+
+//     CloseHandle(readPipe);
+//     WaitForSingleObject(pi.hProcess, INFINITE);
+
+//     CloseHandle(pi.hProcess);
+//     CloseHandle(pi.hThread);
+
+//     return buffer;
+// }
+
