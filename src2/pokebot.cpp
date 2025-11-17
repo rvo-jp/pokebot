@@ -29,6 +29,10 @@ Pokebot& Pokebot::getInstance() {
 // 初回生成時に自動起動
 Pokebot::Pokebot() {
     hThread = CreateThread(NULL, 0, Pokebot::hookThread, NULL, 0, NULL);
+
+    // ---- GDI+ init (once) ----
+    GdiplusStartupInput gdiplusStartupInput;
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
 }
 
 // 解放時に自動終了
@@ -37,6 +41,9 @@ Pokebot::~Pokebot() {
     PostThreadMessage(threadId, WM_QUIT, 0, 0);
     WaitForSingleObject(hThread, INFINITE);
     CloseHandle(hThread);
+
+    // ---- GDI+ shutdown (once) ----
+    GdiplusShutdown(gdiplusToken);
 }
 
 // スレッド

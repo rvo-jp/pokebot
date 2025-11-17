@@ -7,7 +7,6 @@ Bot::Bot(const string& label, const string& _port) {
         throw runtime_error("Window '" + label + "'not found");
     }
 
-    // runCommandAsync(".\\platform-tools\\adb connect 127.0.0.1:" + port);
     runCommand(".\\platform-tools\\adb connect 127.0.0.1:" + port);
     string output = runCommand(".\\platform-tools\\adb -s 127.0.0.1:" + port + " shell wm size");
     
@@ -66,7 +65,7 @@ void Bot::swipe(const POINT startPos, const POINT endPos, DWORD time) {
 }
 
 // US配列前提
-static int vk_to_android(const DWORD vk) {
+int Bot::vk_to_android(const DWORD vk) {
     switch (vk) {
         case 'A': return 29;
         case 'B': return 30;
@@ -290,44 +289,115 @@ string Bot::runCommand(const string& command) {
     return output;
 }
 
+// スクショPNG配列出力
+vector<unsigned char> Bot::execAdbScreencap() {
+    SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+    HANDLE readPipe, writePipe;
 
-// vector<unsigned char> execAdbScreencap() {
-//     SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-//     HANDLE readPipe, writePipe;
+    CreatePipe(&readPipe, &writePipe, &sa, 0);
+    SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
 
-//     CreatePipe(&readPipe, &writePipe, &sa, 0);
-//     SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
+    PROCESS_INFORMATION pi;
+    STARTUPINFOA si = { sizeof(STARTUPINFOA) };
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = writePipe;
+    si.hStdError = writePipe;
 
-//     PROCESS_INFORMATION pi;
-//     STARTUPINFOA si = { sizeof(STARTUPINFOA) };
-//     si.dwFlags = STARTF_USESTDHANDLES;
-//     si.hStdOutput = writePipe;
-//     si.hStdError = writePipe;
+    string cmd = ".\\platform-tools\\adb -s 127.0.0.1:" + port + "exec-out screencap -p";
+    vector<char> cmdBuffer(cmd.begin(), cmd.end());
+    cmdBuffer.push_back('\0');
 
-//     char cmd[] = "adb exec-out screencap -p";
+    CreateProcessA(NULL, cmdBuffer.data(), NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    CloseHandle(writePipe);
 
-//     CreateProcessA(
-//         NULL, cmd, NULL, NULL, TRUE,
-//         CREATE_NO_WINDOW, NULL, NULL,
-//         &si, &pi
-//     );
+    vector<unsigned char> buffer;
+    unsigned char temp[4096];
+    DWORD bytesRead;
 
-//     CloseHandle(writePipe);
+    while (ReadFile(readPipe, temp, sizeof(temp), &bytesRead, NULL) && bytesRead > 0) {
+        buffer.insert(buffer.end(), temp, temp + bytesRead);
+    }
 
-//     vector<unsigned char> buffer;
-//     unsigned char temp[4096];
-//     DWORD bytesRead;
+    CloseHandle(readPipe);
+    WaitForSingleObject(pi.hProcess, INFINITE);
 
-//     while (ReadFile(readPipe, temp, sizeof(temp), &bytesRead, NULL) && bytesRead > 0) {
-//         buffer.insert(buffer.end(), temp, temp + bytesRead);
-//     }
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
 
-//     CloseHandle(readPipe);
-//     WaitForSingleObject(pi.hProcess, INFINITE);
+    return buffer;
+}
 
-//     CloseHandle(pi.hProcess);
-//     CloseHandle(pi.hThread);
+// PNGバイト列からBitmap生成
+Bitmap* loadPng(const vector<unsigned char>& pngData) {
+    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, pngData.size());
+    if (!hMem) return nullptr;
 
-//     return buffer;
-// }
+    void* pMem = GlobalLock(hMem);
+    memcpy(pMem, pngData.data(), pngData.size());
+    GlobalUnlock(hMem);
 
+    IStream* pStream = nullptr;
+    if (CreateStreamOnHGlobal(hMem, TRUE, &pStream) != S_OK) {
+        GlobalFree(hMem);
+        return nullptr;
+    }
+
+    Bitmap* bmp = Bitmap::FromStream(pStream);
+    pStream->Release();
+    return bmp;
+}
+
+
+bool matchPixelColor(Bitmap* bmp, int x, int y, unsigned long value) {
+    Color color;
+    if (bmp->GetPixel(x, y, &color) != Ok) return false;
+    return color.GetValue() == ARGB(value);
+}
+
+void Bot::watchLoop() {
+    while (watch) {
+        vector<unsigned char> pngBuffer;
+        pngBuffer = execAdbScreencap();
+
+        // テスト用に pngBuffer が空でないことを確認
+        if (pngBuffer.empty()) {
+            cerr << "pngBuffer is empty!\n";
+            return;
+        }
+
+        Bitmap* bmp = loadPng(pngBuffer);
+        if (!bmp || bmp->GetLastStatus() != Gdiplus::Ok) {
+            cerr << "Failed to load PNG\n";
+            return;
+        }
+
+        if (
+            matchPixelColor(bmp, 470, 917, 4285168272) &&
+            matchPixelColor(bmp, 470, 917, 4285168272) &&
+            matchPixelColor(bmp, 490, 906, 4289970380) &&
+            matchPixelColor(bmp, 495, 894, 4285234064) &&
+            matchPixelColor(bmp, 495, 919, 4285168272) &&
+            matchPixelColor(bmp, 480, 906, 4293259253) &&
+            matchPixelColor(bmp, 485, 885, 4293325046) &&
+            matchPixelColor(bmp, 485, 927, 4293127925) 
+        ) {
+            tap((POINT){485, 906});
+        }
+
+        delete bmp;
+        Sleep(1000);
+    }
+}
+
+void Bot::startWatch() {
+    watch = true;
+    thread worker(&Bot::watchLoop, this);
+    watchWoaker = move(worker); 
+}
+
+void Bot::endWatch() {
+    watch = false;
+    if (watchWoaker.joinable()) {
+        watchWoaker.join();
+    }
+}

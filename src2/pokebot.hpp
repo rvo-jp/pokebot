@@ -35,4 +35,6 @@ private:
     static DWORD WINAPI hookThread(LPVOID lpParam);
     static LRESULT CALLBACK mouseProc(int nCode, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK keyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
+
+    ULONG_PTR gdiplusToken;
 };

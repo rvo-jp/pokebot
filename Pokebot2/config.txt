@@ -8,9 +8,12 @@ mono2:5715
 akagi:5655
 haruka:5755
 leaf:5735
+rocket:5725
+red:5745
 bot0:5675
-bot1:5745
-bot2:5695
-bot3:
+bot1:5795
+nanja:5695
+bot3:5775
 bot4:5765
-bot5:5725
+bot5:5785
+bot2:5805
