@@ -25,6 +25,9 @@ public:
     void tap(const POINT pos);
     void swipe(const POINT startPos, const POINT endPos, DWORD time);
     void keyevent(const DWORD key);
+
+    void startWatch();
+    void endWatch();
     
 private:
     string port;
@@ -42,6 +45,4 @@ private:
     vector<unsigned char> execAdbScreencap();
     
     void watchLoop();
-    void startWatch();
-    void endWatch();
 };
