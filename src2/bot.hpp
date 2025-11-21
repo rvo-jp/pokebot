@@ -39,7 +39,6 @@ private:
     bool watch = false;
 
     void inputShell(const string& input);
-    static int vk_to_android(const DWORD vk);
     string runCommand(const string& command);
     void runCommandAsync(const string& command);
     vector<unsigned char> execAdbScreencap();

@@ -21,12 +21,14 @@ Bot::Bot(const string& label, const string& _port) {
     else {
         throw runtime_error("Failed to parse screen size from output: " + output);
     }
+    startWatch();
 
     // デバッグ表示
     cout << "[DEBUG] Connected to " << label << " (" << width << "x" << height << ")" << endl;
 }
 
 Bot::~Bot() {
+    endWatch();
     runCommandAsync(".\\platform-tools\\adb disconnect 127.0.0.1:" + port);
 }
 
@@ -65,7 +67,7 @@ void Bot::swipe(const POINT startPos, const POINT endPos, DWORD time) {
 }
 
 // US配列前提
-int Bot::vk_to_android(const DWORD vk) {
+static int vk_to_android(const DWORD vk) {
     switch (vk) {
         case 'A': return 29;
         case 'B': return 30;
@@ -328,7 +330,7 @@ vector<unsigned char> Bot::execAdbScreencap() {
 }
 
 // PNGバイト列からBitmap生成
-Bitmap* loadPng(const vector<unsigned char>& pngData) {
+static Bitmap* loadPng(const vector<unsigned char>& pngData) {
     HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, pngData.size());
     if (!hMem) return nullptr;
 
@@ -348,7 +350,7 @@ Bitmap* loadPng(const vector<unsigned char>& pngData) {
 }
 
 
-bool matchPixelColor(Bitmap* bmp, int x, int y, unsigned long value) {
+static bool matchPixelColor(Bitmap* bmp, int x, int y, unsigned long value) {
     Color color;
     if (bmp->GetPixel(x, y, &color) != Ok) return false;
     return color.GetValue() == ARGB(value);
